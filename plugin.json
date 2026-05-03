@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/SteamClientHomebrew/Millennium/main/src/sys/plugin-schema.json",
+  "name": "steam-completion-companion",
+  "common_name": "Steam Completion Companion",
+  "description": "Shows game completion context in Steam, including completion time, restricted achievements, DLC info, and achievement availability notes.",
+  "version": "0.1.0",
+  "backendType": "lua",
+  "useBackend": true
+}
