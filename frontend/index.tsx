@@ -8,7 +8,7 @@ import {
   Millennium,
 } from '@steambrew/client';
 
-const NS = '[SCC_FRONTEND]';
+const NS = '[SHC_FRONTEND]';
 
 type IPCValue = string | number | boolean | null;
 type IPCParams = Record<string, IPCValue>;
@@ -16,7 +16,6 @@ type IPCParams = Record<string, IPCValue>;
 type ShcResponseItem = {
   label?: string;
   value?: string;
-  kind?: string;
 };
 
 type ShcResponse = {
@@ -47,11 +46,13 @@ declare global {
 
 const shcJsonBridge = callable<[params: IPCParams], string>('shc_json_bridge');
 
-const PANEL_ID = 'scc-library-panel';
-const STYLE_ID = 'scc-library-style';
+const PANEL_ID = 'shc-companion-library-panel';
+const STYLE_ID = 'shc-companion-library-style';
+const FA_STYLE_ID = 'shc-font-awesome-style';
 
 const LIBRARY_PATH_PATTERN = /\/library\/app\/(\d+)/i;
 const GENERIC_APP_PATH_PATTERN = /\/app\/(\d+)/i;
+
 const LIBRARY_GAME_CONTAINER_SELECTOR = '.NZMJ6g2iVnFsOOp-lDmIP';
 
 let currentDocument: Document | null = null;
@@ -232,6 +233,14 @@ function removePanel(doc: Document) {
 }
 
 function ensureStyle(doc: Document) {
+  if (!doc.getElementById(FA_STYLE_ID)) {
+    const fa = doc.createElement('link');
+    fa.id = FA_STYLE_ID;
+    fa.rel = 'stylesheet';
+    fa.href = 'https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css';
+    doc.head?.appendChild(fa);
+  }
+
   if (doc.getElementById(STYLE_ID)) {
     return;
   }
@@ -264,7 +273,7 @@ function ensureStyle(doc: Document) {
       box-sizing: border-box;
     }
 
-    #${PANEL_ID} .scc-row {
+    #${PANEL_ID} .shc-row {
       display: flex;
       justify-content: space-between;
       gap: 10px;
@@ -272,31 +281,67 @@ function ensureStyle(doc: Document) {
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    #${PANEL_ID} .scc-row:first-child {
+    #${PANEL_ID} .shc-row:first-child {
       border-top: 0;
       padding-top: 0;
     }
 
-    #${PANEL_ID} .scc-label {
+    #${PANEL_ID} .shc-label {
+      color: #91a4b5;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    #${PANEL_ID} .shc-label-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    #${PANEL_ID} .shc-row-icon {
+      width: 14px;
+      min-width: 14px;
+      text-align: center;
+      font-size: 12px;
+      opacity: 0.95;
+    }
+
+    #${PANEL_ID} .shc-row-icon-normal {
+      color: #ffffff;
+    }
+
+    #${PANEL_ID} .shc-row-icon-muted {
       color: #91a4b5;
     }
 
-    #${PANEL_ID} .scc-value {
-      color: #ffffff;
-      text-align: right;
-      overflow-wrap: anywhere;
-      font-weight: 700;
-    }
-
-    #${PANEL_ID} .scc-row-warning .scc-value {
+    #${PANEL_ID} .shc-row-icon-warning {
       color: #ffcc66;
     }
 
-    #${PANEL_ID} .scc-row-error .scc-value {
+    #${PANEL_ID} .shc-row-icon-broken {
+      color: #66c0f4;
+    }
+
+    #${PANEL_ID} .shc-row-icon-conditional {
+      color: #f7c948;
+    }
+
+    #${PANEL_ID} .shc-row-icon-unobtainable {
+      color: #ff6b6b;
+    }
+
+    #${PANEL_ID} .shc-value {
+      color: #ffffff;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    #${PANEL_ID} .shc-error {
       color: #ffb4b4;
     }
 
-    #${PANEL_ID} .scc-footer {
+    #${PANEL_ID} .shc-footer {
       display: flex;
       justify-content: flex-end;
       align-items: center;
@@ -305,7 +350,7 @@ function ensureStyle(doc: Document) {
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    #${PANEL_ID} .scc-link {
+    #${PANEL_ID} .shc-link {
       display: inline-flex;
       align-items: center;
       gap: 5px;
@@ -316,13 +361,13 @@ function ensureStyle(doc: Document) {
       opacity: 0.9;
     }
 
-    #${PANEL_ID} .scc-link:hover {
+    #${PANEL_ID} .shc-link:hover {
       color: #ffffff;
       opacity: 1;
       text-decoration: none;
     }
 
-    #${PANEL_ID} .scc-link-icon {
+    #${PANEL_ID} .shc-link-icon {
       width: 14px;
       height: 14px;
       display: block;
@@ -330,7 +375,7 @@ function ensureStyle(doc: Document) {
       flex: 0 0 auto;
     }
 
-    #${PANEL_ID} .scc-link-icon-fallback {
+    #${PANEL_ID} .shc-link-icon-fallback {
       width: 14px;
       height: 14px;
       display: inline-flex;
@@ -345,13 +390,8 @@ function ensureStyle(doc: Document) {
       flex: 0 0 auto;
     }
 
-    #${PANEL_ID} .scc-link-icon-fallback-hidden {
+    #${PANEL_ID} .shc-link-icon-fallback-hidden {
       display: none;
-    }
-
-    #${PANEL_ID} .scc-error {
-      color: #ffb4b4;
-      padding: 4px 0;
     }
   `;
 
@@ -373,7 +413,7 @@ function getOrCreatePanel(doc: Document, container: HTMLElement): HTMLElement {
 
   const panel = doc.createElement('div');
   panel.id = PANEL_ID;
-  panel.setAttribute('data-scc-library-panel', '1');
+  panel.setAttribute('data-shc-library-panel', '1');
 
   container.style.position = 'relative';
   container.appendChild(panel);
@@ -395,35 +435,52 @@ function parseBackendResponse(raw: string): ShcResponse {
       title: 'Steam Completion Companion',
       summary: 'Backend returned non JSON response.',
       restricted_count: 0,
-      items: [
-        {
-          label: 'Error',
-          value: 'Backend returned non JSON response.',
-          kind: 'error',
-        },
-      ],
+      items: [],
       error: raw,
     };
   }
 }
 
-function rowClassForKind(kind: string): string {
-  if (
-    kind === 'paid_dlc' ||
-    kind === 'restricted' ||
-    kind === 'removed' ||
-    kind === 'broken' ||
-    kind === 'conditional' ||
-    kind === 'unobtainable'
-  ) {
-    return ' scc-row-warning';
+function getRowIconClass(label: string): string {
+  const lower = label.toLowerCase();
+
+  if (lower.includes('paid dlc')) {
+    return 'fa fa-shopping-cart shc-row-icon-warning';
   }
 
-  if (kind === 'error') {
-    return ' scc-row-error';
+  if (lower.includes('broken but obtainable')) {
+    return 'fa fa-info-circle shc-row-icon-broken';
   }
 
-  return '';
+  if (lower.includes('conditionally obtainable')) {
+    return 'fa fa-warning shc-row-icon-conditional';
+  }
+
+  if (lower.includes('unobtainable')) {
+    return 'fa fa-exclamation-circle shc-row-icon-unobtainable';
+  }
+
+  if (lower.includes('restricted')) {
+    return 'fa fa-spinner shc-row-icon-warning';
+  }
+
+  if (lower.includes('players perfected')) {
+    return 'fa fa-star shc-row-icon-normal';
+  }
+
+  if (lower.includes('median completion')) {
+    return 'fa fa-clock-o shc-row-icon-normal';
+  }
+
+  if (lower.includes('steamdb rating')) {
+    return 'fa fa-bar-chart shc-row-icon-normal';
+  }
+
+  if (lower.includes('perfected by starters')) {
+    return 'fa fa-percent shc-row-icon-normal';
+  }
+
+  return 'fa fa-info-circle shc-row-icon-muted';
 }
 
 function renderResponse(
@@ -442,15 +499,18 @@ function renderResponse(
 
   if (Array.isArray(response.items)) {
     for (const item of response.items) {
-      const label = safeText(item.label);
-      const value = safeText(item.value);
-      const kind = safeText(item.kind || 'metric');
-      const rowClass = rowClassForKind(String(item.kind || 'metric'));
+      const rawLabel = String(item.label || '');
+      const iconClass = `${getRowIconClass(rawLabel)} shc-row-icon`;
 
       rows.push(`
-        <div class="scc-row${rowClass}" data-kind="${kind}">
-          <div class="scc-label">${label}</div>
-          <div class="scc-value">${value}</div>
+        <div class="shc-row">
+          <div class="shc-label">
+            <span class="shc-label-wrap">
+              <i class="${safeText(iconClass)}" aria-hidden="true"></i>
+              <span>${safeText(item.label)}</span>
+            </span>
+          </div>
+          <div class="shc-value">${safeText(item.value)}</div>
         </div>
       `);
     }
@@ -469,14 +529,14 @@ function renderResponse(
 
   const footer = steamHuntersUrl
     ? `
-      <div class="scc-footer">
-        <a class="scc-link" href="${steamHuntersUrl}" target="_blank" rel="noopener noreferrer">
+      <div class="shc-footer">
+        <a class="shc-link" href="${steamHuntersUrl}" target="_blank" rel="noopener noreferrer">
           <img
-            class="scc-link-icon"
-            src="https://www.google.com/s2/favicons?domain=steamhunters.com&sz=32"
-            onerror="this.style.display='none'; this.nextElementSibling.classList.remove('scc-link-icon-fallback-hidden');"
+            class="shc-link-icon"
+            src="https://steamhunters.com/content/img/steam_hunters.svg?v=201706240149"
+            onerror="this.style.display='none'; this.nextElementSibling.classList.remove('shc-link-icon-fallback-hidden');"
           />
-          <span class="scc-link-icon-fallback scc-link-icon-fallback-hidden">SH</span>
+          <span class="shc-link-icon-fallback shc-link-icon-fallback-hidden">SH</span>
           <span>View on SteamHunters →</span>
         </a>
       </div>
@@ -492,14 +552,25 @@ function renderResponse(
 function renderError(
   doc: Document,
   container: HTMLElement,
-  _appId: number,
-  _reason: string,
+  appId: number,
+  reason: string,
   message: string
 ) {
   const panel = getOrCreatePanel(doc, container);
 
   panel.innerHTML = `
-    <div class="scc-error">${safeText(message)}</div>
+    <div class="shc-row">
+      <div class="shc-label">Error</div>
+      <div class="shc-value shc-error">${safeText(message)}</div>
+    </div>
+    <div class="shc-row">
+      <div class="shc-label">App ID</div>
+      <div class="shc-value">${safeText(appId)}</div>
+    </div>
+    <div class="shc-row">
+      <div class="shc-label">Reason</div>
+      <div class="shc-value">${safeText(reason)}</div>
+    </div>
   `;
 }
 
@@ -686,7 +757,7 @@ function ProbeContent() {
 
   return (
     <Field
-      label="Steam Completion Companion"
+      label="SteamHunters Companion Probe"
       description={status}
       bottomSeparator="standard"
     >
