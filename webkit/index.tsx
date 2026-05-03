@@ -8,6 +8,7 @@ type IPCParams = Record<string, IPCValue>;
 type ShcResponseItem = {
   label?: string;
   value?: string;
+  kind?: string;
 };
 
 type ShcResponse = {
@@ -146,15 +147,19 @@ function ensureStyle() {
       white-space: nowrap;
     }
 
-    #${PANEL_ID} .scc-value-warning {
+    #${PANEL_ID} .scc-row-warning .scc-value {
       color: #ffcc66;
+    }
+
+    #${PANEL_ID} .scc-row-error .scc-value {
+      color: #ffb4b4;
     }
 
     #${PANEL_ID} .scc-error {
       color: #ffb4b4;
       padding: 4px 0;
     }
-    
+
     #${PANEL_ID} .scc-footer {
       display: flex;
       justify-content: flex-end;
@@ -181,7 +186,7 @@ function ensureStyle() {
       text-decoration: none;
     }
 
-       #${PANEL_ID} .scc-link-icon {
+    #${PANEL_ID} .scc-link-icon {
       width: 14px;
       height: 14px;
       display: block;
@@ -328,23 +333,35 @@ function parseBackendResponse(raw: string): ShcResponse {
       title: 'Steam Completion Companion',
       summary: 'Backend returned non JSON response.',
       restricted_count: 0,
-      items: [],
+      items: [
+        {
+          label: 'Error',
+          value: 'Backend returned non JSON response.',
+          kind: 'error',
+        },
+      ],
       error: raw,
     };
   }
 }
 
-function isWarningRow(label: string): boolean {
-  const lower = label.toLowerCase();
+function rowClassForKind(kind: string): string {
+  if (
+    kind === 'paid_dlc' ||
+    kind === 'restricted' ||
+    kind === 'removed' ||
+    kind === 'broken' ||
+    kind === 'conditional' ||
+    kind === 'unobtainable'
+  ) {
+    return ' scc-row-warning';
+  }
 
-  return (
-    lower.includes('paid dlc') ||
-    lower.includes('restricted') ||
-    lower.includes('broken') ||
-    lower.includes('conditionally') ||
-    lower.includes('unobtainable') ||
-    lower.includes('error')
-  );
+  if (kind === 'error') {
+    return ' scc-row-error';
+  }
+
+  return '';
 }
 
 function renderResponse(response: ShcResponse) {
@@ -359,12 +376,13 @@ function renderResponse(response: ShcResponse) {
     for (const item of response.items) {
       const label = safeText(item.label);
       const value = safeText(item.value);
-      const warningClass = isWarningRow(String(item.label || '')) ? ' scc-value-warning' : '';
+      const kind = safeText(item.kind || 'metric');
+      const rowClass = rowClassForKind(String(item.kind || 'metric'));
 
       rows.push(`
-        <div class="scc-row">
+        <div class="scc-row${rowClass}" data-kind="${kind}">
           <div class="scc-label">${label}</div>
-          <div class="scc-value${warningClass}">${value}</div>
+          <div class="scc-value">${value}</div>
         </div>
       `);
     }
@@ -386,21 +404,21 @@ function renderResponse(response: ShcResponse) {
     ? safeText(response.steam_hunters_url)
     : '';
 
-const footer = steamHuntersUrl
-  ? `
-    <div class="scc-footer">
-      <a class="scc-link" href="${steamHuntersUrl}" target="_blank" rel="noopener noreferrer">
-        <img
-          class="scc-link-icon"
-          src="https://www.google.com/s2/favicons?domain=steamhunters.com&sz=32"
-          onerror="this.style.display='none'; this.nextElementSibling.classList.remove('scc-link-icon-fallback-hidden');"
-        />
-        <span class="scc-link-icon-fallback scc-link-icon-fallback-hidden">SH</span>
-        <span>View on SteamHunters →</span>
-      </a>
-    </div>
-  `
-  : '';
+  const footer = steamHuntersUrl
+    ? `
+      <div class="scc-footer">
+        <a class="scc-link" href="${steamHuntersUrl}" target="_blank" rel="noopener noreferrer">
+          <img
+            class="scc-link-icon"
+            src="https://www.google.com/s2/favicons?domain=steamhunters.com&sz=32"
+            onerror="this.style.display='none'; this.nextElementSibling.classList.remove('scc-link-icon-fallback-hidden');"
+          />
+          <span class="scc-link-icon-fallback scc-link-icon-fallback-hidden">SH</span>
+          <span>View on SteamHunters →</span>
+        </a>
+      </div>
+    `
+    : '';
 
   panel.innerHTML = `
     <div class="scc-card">

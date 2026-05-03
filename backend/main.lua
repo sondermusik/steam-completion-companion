@@ -268,7 +268,7 @@ local function fetch_steamhunters_achievements(app_id)
     return counts, nil, false
 end
 
-local function add_item(items, label, value)
+local function add_item(items, label, value, kind)
     if value == nil then
         return
     end
@@ -279,23 +279,25 @@ local function add_item(items, label, value)
 
     table.insert(items, {
         label = label,
-        value = tostring(value)
+        value = tostring(value),
+        kind = kind or "metric"
     })
 end
 
-local function add_count_if_positive(items, label, value)
+local function add_count_if_positive(items, label, value, kind)
     local count = to_number(value, 0)
 
     if count <= 0 then
         return
     end
 
-    add_item(items, label, tostring(count))
+    add_item(items, label, tostring(count), kind)
 end
 
 local function make_error_response(app_id, page_kind, error_message)
     return encode_json({
         ok = false,
+        show_panel = true,
         type = "completion_context",
         source = "steamhunters",
         app_id = to_number(app_id, 0),
@@ -306,7 +308,8 @@ local function make_error_response(app_id, page_kind, error_message)
         items = {
             {
                 label = "Error",
-                value = tostring(error_message)
+                value = tostring(error_message),
+                kind = "error"
             }
         }
     })
@@ -315,12 +318,13 @@ end
 local function make_no_app_response(page_kind)
     return encode_json({
         ok = true,
+        show_panel = false,
         type = "completion_context",
         source = "steamhunters",
         has_app = false,
         page_kind = tostring(page_kind or "unknown"),
         title = "Steam Completion Companion",
-        summary = "No app id detected on this page.",
+        summary = "",
         restricted_count = 0,
         items = {}
     })
@@ -360,30 +364,34 @@ local function make_app_response(app, achievements, page_kind, app_from_cache, a
 
     local items = {}
 
-    add_item(items, "Median completion", format_minutes(app.median_completion_time))
-    add_item(items, "SteamDB rating", format_rating(app.steam_db_rating))
-
-    add_item(items, "Players perfected", tostring(to_number(app.players_perfected_count, 0)))
+    add_item(items, "Median completion", format_minutes(app.median_completion_time), "median_completion")
+    add_item(items, "SteamDB rating", format_rating(app.steam_db_rating), "steamdb_rating")
+    add_item(items, "Players perfected", tostring(to_number(app.players_perfected_count, 0)), "players_perfected")
     add_item(
         items,
         "Perfected by starters",
-        format_percent_of_starters(app.players_perfected_count, app.players_started_count)
+        format_percent_of_starters(app.players_perfected_count, app.players_started_count),
+        "perfected_by_starters"
     )
 
     if app.has_paid_dlc == true then
-        add_item(items, "Paid DLC", "Yes")
+        add_item(items, "Paid DLC", "Yes", "paid_dlc")
     end
 
     if app.is_restricted == true then
-        add_item(items, "Restricted", "Yes")
+        add_item(items, "Restricted", "Yes", "restricted")
     end
 
-    add_count_if_positive(items, "Broken but obtainable", broken_but_obtainable)
-    add_count_if_positive(items, "Conditionally obtainable", conditionally_obtainable)
-    add_count_if_positive(items, "Unobtainable", unobtainable)
+    if app.is_removed == true then
+        add_item(items, "Removed", "Yes", "removed")
+    end
+
+    add_count_if_positive(items, "Broken but obtainable", broken_but_obtainable, "broken")
+    add_count_if_positive(items, "Conditionally obtainable", conditionally_obtainable, "conditional")
+    add_count_if_positive(items, "Unobtainable", unobtainable, "unobtainable")
 
     if achievements_error ~= nil then
-        add_item(items, "Achievement detail error", achievements_error)
+        add_item(items, "Achievement detail error", achievements_error, "error")
     end
 
     return encode_json({

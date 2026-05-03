@@ -8,7 +8,7 @@ import {
   Millennium,
 } from '@steambrew/client';
 
-const NS = '[SHC_FRONTEND]';
+const NS = '[SCC_FRONTEND]';
 
 type IPCValue = string | number | boolean | null;
 type IPCParams = Record<string, IPCValue>;
@@ -16,6 +16,7 @@ type IPCParams = Record<string, IPCValue>;
 type ShcResponseItem = {
   label?: string;
   value?: string;
+  kind?: string;
 };
 
 type ShcResponse = {
@@ -46,13 +47,11 @@ declare global {
 
 const shcJsonBridge = callable<[params: IPCParams], string>('shc_json_bridge');
 
-const PANEL_ID = 'shc-companion-library-panel';
-const STYLE_ID = 'shc-companion-library-style';
+const PANEL_ID = 'scc-library-panel';
+const STYLE_ID = 'scc-library-style';
 
 const LIBRARY_PATH_PATTERN = /\/library\/app\/(\d+)/i;
 const GENERIC_APP_PATH_PATTERN = /\/app\/(\d+)/i;
-
-// Same Steam desktop library game container used by the HLTB plugin.
 const LIBRARY_GAME_CONTAINER_SELECTOR = '.NZMJ6g2iVnFsOOp-lDmIP';
 
 let currentDocument: Document | null = null;
@@ -265,38 +264,7 @@ function ensureStyle(doc: Document) {
       box-sizing: border-box;
     }
 
-    #${PANEL_ID} .shc-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-
-    #${PANEL_ID} .shc-title {
-      font-weight: 700;
-      font-size: 13px;
-      color: #ffffff;
-      letter-spacing: 0.2px;
-    }
-
-    #${PANEL_ID} .shc-badge {
-      padding: 2px 7px;
-      border-radius: 999px;
-      color: #9fd4ff;
-      background: rgba(74, 144, 196, 0.18);
-      border: 1px solid rgba(126, 189, 232, 0.22);
-      font-size: 11px;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-
-    #${PANEL_ID} .shc-summary {
-      color: #c9d3dc;
-      margin-bottom: 9px;
-    }
-
-    #${PANEL_ID} .shc-row {
+    #${PANEL_ID} .scc-row {
       display: flex;
       justify-content: space-between;
       gap: 10px;
@@ -304,33 +272,31 @@ function ensureStyle(doc: Document) {
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    #${PANEL_ID} .shc-row:first-child {
+    #${PANEL_ID} .scc-row:first-child {
       border-top: 0;
       padding-top: 0;
     }
 
-    #${PANEL_ID} .shc-label {
+    #${PANEL_ID} .scc-label {
       color: #91a4b5;
     }
 
-    #${PANEL_ID} .shc-value {
+    #${PANEL_ID} .scc-value {
       color: #ffffff;
       text-align: right;
       overflow-wrap: anywhere;
+      font-weight: 700;
     }
 
-    #${PANEL_ID} .shc-error {
+    #${PANEL_ID} .scc-row-warning .scc-value {
+      color: #ffcc66;
+    }
+
+    #${PANEL_ID} .scc-row-error .scc-value {
       color: #ffb4b4;
     }
 
-    #${PANEL_ID} .shc-small {
-      margin-top: 9px;
-      color: #6f8394;
-      font-size: 11px;
-      overflow-wrap: anywhere;
-    }
-
-        #${PANEL_ID} .shc-footer {
+    #${PANEL_ID} .scc-footer {
       display: flex;
       justify-content: flex-end;
       align-items: center;
@@ -339,7 +305,7 @@ function ensureStyle(doc: Document) {
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    #${PANEL_ID} .shc-link {
+    #${PANEL_ID} .scc-link {
       display: inline-flex;
       align-items: center;
       gap: 5px;
@@ -350,13 +316,13 @@ function ensureStyle(doc: Document) {
       opacity: 0.9;
     }
 
-    #${PANEL_ID} .shc-link:hover {
+    #${PANEL_ID} .scc-link:hover {
       color: #ffffff;
       opacity: 1;
       text-decoration: none;
     }
 
-    #${PANEL_ID} .shc-link-icon {
+    #${PANEL_ID} .scc-link-icon {
       width: 14px;
       height: 14px;
       display: block;
@@ -364,7 +330,7 @@ function ensureStyle(doc: Document) {
       flex: 0 0 auto;
     }
 
-    #${PANEL_ID} .shc-link-icon-fallback {
+    #${PANEL_ID} .scc-link-icon-fallback {
       width: 14px;
       height: 14px;
       display: inline-flex;
@@ -379,8 +345,13 @@ function ensureStyle(doc: Document) {
       flex: 0 0 auto;
     }
 
-    #${PANEL_ID} .shc-link-icon-fallback-hidden {
+    #${PANEL_ID} .scc-link-icon-fallback-hidden {
       display: none;
+    }
+
+    #${PANEL_ID} .scc-error {
+      color: #ffb4b4;
+      padding: 4px 0;
     }
   `;
 
@@ -402,7 +373,7 @@ function getOrCreatePanel(doc: Document, container: HTMLElement): HTMLElement {
 
   const panel = doc.createElement('div');
   panel.id = PANEL_ID;
-  panel.setAttribute('data-shc-library-panel', '1');
+  panel.setAttribute('data-scc-library-panel', '1');
 
   container.style.position = 'relative';
   container.appendChild(panel);
@@ -424,10 +395,35 @@ function parseBackendResponse(raw: string): ShcResponse {
       title: 'Steam Completion Companion',
       summary: 'Backend returned non JSON response.',
       restricted_count: 0,
-      items: [],
+      items: [
+        {
+          label: 'Error',
+          value: 'Backend returned non JSON response.',
+          kind: 'error',
+        },
+      ],
       error: raw,
     };
   }
+}
+
+function rowClassForKind(kind: string): string {
+  if (
+    kind === 'paid_dlc' ||
+    kind === 'restricted' ||
+    kind === 'removed' ||
+    kind === 'broken' ||
+    kind === 'conditional' ||
+    kind === 'unobtainable'
+  ) {
+    return ' scc-row-warning';
+  }
+
+  if (kind === 'error') {
+    return ' scc-row-error';
+  }
+
+  return '';
 }
 
 function renderResponse(
@@ -446,10 +442,15 @@ function renderResponse(
 
   if (Array.isArray(response.items)) {
     for (const item of response.items) {
+      const label = safeText(item.label);
+      const value = safeText(item.value);
+      const kind = safeText(item.kind || 'metric');
+      const rowClass = rowClassForKind(String(item.kind || 'metric'));
+
       rows.push(`
-        <div class="shc-row">
-          <div class="shc-label">${safeText(item.label)}</div>
-          <div class="shc-value">${safeText(item.value)}</div>
+        <div class="scc-row${rowClass}" data-kind="${kind}">
+          <div class="scc-label">${label}</div>
+          <div class="scc-value">${value}</div>
         </div>
       `);
     }
@@ -462,52 +463,43 @@ function renderResponse(
 
   const panel = getOrCreatePanel(doc, container);
 
-const steamHuntersUrl = response.steam_hunters_url
-  ? safeText(response.steam_hunters_url)
-  : '';
+  const steamHuntersUrl = response.steam_hunters_url
+    ? safeText(response.steam_hunters_url)
+    : '';
 
-const footer = steamHuntersUrl
-  ? `
-    <div class="shc-footer">
-      <a class="shc-link" href="${steamHuntersUrl}" target="_blank" rel="noopener noreferrer">
-        <img
-          class="shc-link-icon"
-          src="https://www.google.com/s2/favicons?domain=steamhunters.com&sz=32"
-          onerror="this.style.display='none'; this.nextElementSibling.classList.remove('shc-link-icon-fallback-hidden');"
-        />
-        <span class="shc-link-icon-fallback shc-link-icon-fallback-hidden">SH</span>
-        <span>View on SteamHunters →</span>
-      </a>
-    </div>
-  `
-  : '';
+  const footer = steamHuntersUrl
+    ? `
+      <div class="scc-footer">
+        <a class="scc-link" href="${steamHuntersUrl}" target="_blank" rel="noopener noreferrer">
+          <img
+            class="scc-link-icon"
+            src="https://www.google.com/s2/favicons?domain=steamhunters.com&sz=32"
+            onerror="this.style.display='none'; this.nextElementSibling.classList.remove('scc-link-icon-fallback-hidden');"
+          />
+          <span class="scc-link-icon-fallback scc-link-icon-fallback-hidden">SH</span>
+          <span>View on SteamHunters →</span>
+        </a>
+      </div>
+    `
+    : '';
 
-panel.innerHTML = `
-  ${rows.join('')}
-  ${footer}
-`;
+  panel.innerHTML = `
+    ${rows.join('')}
+    ${footer}
+  `;
 }
 
 function renderError(
   doc: Document,
   container: HTMLElement,
-  appId: number,
-  reason: string,
+  _appId: number,
+  _reason: string,
   message: string
 ) {
   const panel = getOrCreatePanel(doc, container);
 
   panel.innerHTML = `
-    <div class="shc-head">
-      <div class="shc-title">SteamHunters Companion</div>
-      <div class="shc-badge">library</div>
-    </div>
-    <div class="shc-summary shc-error">${safeText(message)}</div>
-    <div class="shc-row">
-      <div class="shc-label">App ID</div>
-      <div class="shc-value">${safeText(appId)}</div>
-    </div>
-    <div class="shc-small">reason=${safeText(reason)}</div>
+    <div class="scc-error">${safeText(message)}</div>
   `;
 }
 
@@ -647,6 +639,7 @@ function setupLibraryObserver(doc: Document) {
   });
 
   scheduleLibraryUpdate(doc, 'initial');
+
   window.setInterval(() => {
     if (currentDocument === doc) {
       scheduleLibraryUpdate(doc, 'interval');
@@ -693,7 +686,7 @@ function ProbeContent() {
 
   return (
     <Field
-      label="SteamHunters Companion Probe"
+      label="Steam Completion Companion"
       description={status}
       bottomSeparator="standard"
     >
