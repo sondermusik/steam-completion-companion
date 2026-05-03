@@ -397,6 +397,7 @@ local function make_app_response(app, achievements, page_kind, app_from_cache, a
         title = "Steam Completion Companion",
         summary = "",
         restricted_count = unobtainable,
+        steam_hunters_url = "https://steamhunters.com/apps/" .. tostring(app.app_id),
         items = items,
         debug = {
             app_cache = app_from_cache and true or false,

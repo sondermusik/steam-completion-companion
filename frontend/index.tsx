@@ -28,6 +28,7 @@ type ShcResponse = {
   title?: string;
   summary?: string;
   restricted_count?: number;
+  steam_hunters_url?: string;
   items?: ShcResponseItem[];
   error?: string;
 };
@@ -303,6 +304,11 @@ function ensureStyle(doc: Document) {
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
+    #${PANEL_ID} .shc-row:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
     #${PANEL_ID} .shc-label {
       color: #91a4b5;
     }
@@ -322,6 +328,59 @@ function ensureStyle(doc: Document) {
       color: #6f8394;
       font-size: 11px;
       overflow-wrap: anywhere;
+    }
+
+        #${PANEL_ID} .shc-footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #${PANEL_ID} .shc-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #66c0f4;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      opacity: 0.9;
+    }
+
+    #${PANEL_ID} .shc-link:hover {
+      color: #ffffff;
+      opacity: 1;
+      text-decoration: none;
+    }
+
+    #${PANEL_ID} .shc-link-icon {
+      width: 14px;
+      height: 14px;
+      display: block;
+      border-radius: 3px;
+      flex: 0 0 auto;
+    }
+
+    #${PANEL_ID} .shc-link-icon-fallback {
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      background: #66c0f4;
+      color: #0b141d;
+      font-size: 7px;
+      font-weight: 800;
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+
+    #${PANEL_ID} .shc-link-icon-fallback-hidden {
+      display: none;
     }
   `;
 
@@ -403,7 +462,30 @@ function renderResponse(
 
   const panel = getOrCreatePanel(doc, container);
 
-  panel.innerHTML = rows.join('');
+const steamHuntersUrl = response.steam_hunters_url
+  ? safeText(response.steam_hunters_url)
+  : '';
+
+const footer = steamHuntersUrl
+  ? `
+    <div class="shc-footer">
+      <a class="shc-link" href="${steamHuntersUrl}" target="_blank" rel="noopener noreferrer">
+        <img
+          class="shc-link-icon"
+          src="https://www.google.com/s2/favicons?domain=steamhunters.com&sz=32"
+          onerror="this.style.display='none'; this.nextElementSibling.classList.remove('shc-link-icon-fallback-hidden');"
+        />
+        <span class="shc-link-icon-fallback shc-link-icon-fallback-hidden">SH</span>
+        <span>View on SteamHunters →</span>
+      </a>
+    </div>
+  `
+  : '';
+
+panel.innerHTML = `
+  ${rows.join('')}
+  ${footer}
+`;
 }
 
 function renderError(

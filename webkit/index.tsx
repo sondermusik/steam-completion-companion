@@ -20,6 +20,7 @@ type ShcResponse = {
   title?: string;
   summary?: string;
   restricted_count?: number;
+  steam_hunters_url?: string;
   items?: ShcResponseItem[];
   error?: string;
 };
@@ -152,6 +153,59 @@ function ensureStyle() {
     #${PANEL_ID} .scc-error {
       color: #ffb4b4;
       padding: 4px 0;
+    }
+    
+    #${PANEL_ID} .scc-footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #${PANEL_ID} .scc-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #66c0f4;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      opacity: 0.9;
+    }
+
+    #${PANEL_ID} .scc-link:hover {
+      color: #ffffff;
+      opacity: 1;
+      text-decoration: none;
+    }
+
+       #${PANEL_ID} .scc-link-icon {
+      width: 14px;
+      height: 14px;
+      display: block;
+      border-radius: 3px;
+      flex: 0 0 auto;
+    }
+
+    #${PANEL_ID} .scc-link-icon-fallback {
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      background: #66c0f4;
+      color: #0b141d;
+      font-size: 7px;
+      font-weight: 800;
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+
+    #${PANEL_ID} .scc-link-icon-fallback-hidden {
+      display: none;
     }
   `;
 
@@ -328,9 +382,30 @@ function renderResponse(response: ShcResponse) {
     return;
   }
 
+  const steamHuntersUrl = response.steam_hunters_url
+    ? safeText(response.steam_hunters_url)
+    : '';
+
+const footer = steamHuntersUrl
+  ? `
+    <div class="scc-footer">
+      <a class="scc-link" href="${steamHuntersUrl}" target="_blank" rel="noopener noreferrer">
+        <img
+          class="scc-link-icon"
+          src="https://www.google.com/s2/favicons?domain=steamhunters.com&sz=32"
+          onerror="this.style.display='none'; this.nextElementSibling.classList.remove('scc-link-icon-fallback-hidden');"
+        />
+        <span class="scc-link-icon-fallback scc-link-icon-fallback-hidden">SH</span>
+        <span>View on SteamHunters →</span>
+      </a>
+    </div>
+  `
+  : '';
+
   panel.innerHTML = `
     <div class="scc-card">
       ${rows.join('')}
+      ${footer}
     </div>
   `;
 }
