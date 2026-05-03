@@ -1,51 +1,420 @@
-local millennium = require("millennium")
 local logger = require("logger")
+local millennium = require("millennium")
+local http = require("http")
+local json = require("json")
 
-local NS = "[SHC_PROBE]"
+local NS = "[SCC]"
 
-local function log(msg)
-    logger:info(NS .. " " .. tostring(msg))
-    print(NS .. " " .. tostring(msg))
+local CACHE_TTL_SECONDS = 60 * 30
+
+local app_cache = {}
+local achievements_cache = {}
+
+local DEFAULT_HEADERS = {
+    ["Accept"] = "application/json",
+    ["X-Requested-With"] = "Steam",
+    ["User-Agent"] =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.142.86 Safari/537.36"
+}
+
+local function log(message)
+    logger:info(NS .. " " .. tostring(message))
+    print(NS .. " " .. tostring(message))
 end
 
-local function escape_json_string(value)
-    value = tostring(value or "")
-    value = value:gsub("\\", "\\\\")
-    value = value:gsub("\"", "\\\"")
-    value = value:gsub("\n", "\\n")
-    value = value:gsub("\r", "\\r")
-    value = value:gsub("\t", "\\t")
-    return value
+local function now()
+    return os.time()
 end
 
-local function extract_json_string(payload_json, key)
-    if type(payload_json) ~= "string" then
-        return ""
+local function to_number(value, fallback)
+    local parsed = tonumber(value)
+
+    if parsed == nil then
+        return fallback or 0
     end
 
-    local pattern = "\"" .. key .. "\"%s*:%s*\"([^\"]*)\""
-    local value = payload_json:match(pattern)
-
-    if value == nil then
-        return ""
-    end
-
-    return value
+    return parsed
 end
 
-local function extract_json_number(payload_json, key)
-    if type(payload_json) ~= "string" then
-        return ""
+local function to_boolean(value)
+    if value == true then
+        return true
     end
 
-    local pattern = "\"" .. key .. "\"%s*:%s*(%d+)"
-    local value = payload_json:match(pattern)
-
-    if value == nil then
-        return ""
+    if value == false then
+        return false
     end
 
-    return value
+    return nil
+end
+
+local function yes_no(value)
+    if value == true then
+        return "Yes"
+    end
+
+    if value == false then
+        return "No"
+    end
+
+    return "Unknown"
+end
+
+local function format_minutes(value)
+    local minutes = tonumber(value)
+
+    if minutes == nil or minutes <= 0 then
+        return "Unknown"
+    end
+
+    minutes = math.floor(minutes + 0.5)
+
+    local hours = math.floor(minutes / 60)
+    local mins = minutes % 60
+
+    if hours <= 0 then
+        return tostring(mins) .. "m"
+    end
+
+    if mins == 0 then
+        return tostring(hours) .. "h"
+    end
+
+    return tostring(hours) .. "h " .. tostring(mins) .. "m"
+end
+
+local function format_rating(value)
+    local rating = tonumber(value)
+
+    if rating == nil then
+        return "Unknown"
+    end
+
+    return string.format("%.1f%%", rating)
+end
+
+local function decode_json(text)
+    if type(text) ~= "string" or text == "" then
+        return nil, "empty JSON string"
+    end
+
+    local ok, decoded = pcall(json.decode, text)
+
+    if not ok then
+        return nil, "JSON decode failed: " .. tostring(decoded)
+    end
+
+    if decoded == nil then
+        return nil, "JSON decode returned nil"
+    end
+
+    return decoded, nil
+end
+
+local function encode_json(value)
+    local ok, encoded = pcall(json.encode, value)
+
+    if not ok then
+        log("json.encode failed: " .. tostring(encoded))
+        return "{\"ok\":false,\"type\":\"error\",\"error\":\"json encode failed\"}"
+    end
+
+    return encoded
+end
+
+local function get_cache(cache_table, app_id)
+    local key = tostring(app_id)
+    local entry = cache_table[key]
+
+    if entry == nil then
+        return nil
+    end
+
+    if now() - entry.time > CACHE_TTL_SECONDS then
+        cache_table[key] = nil
+        return nil
+    end
+
+    return entry.data
+end
+
+local function set_cache(cache_table, app_id, data)
+    cache_table[tostring(app_id)] = {
+        time = now(),
+        data = data
+    }
+end
+
+local function request_json(url)
+    log("request_json: " .. tostring(url))
+
+    local response, err = http.get(url, {
+        headers = DEFAULT_HEADERS,
+        timeout = 20
+    })
+
+    if response == nil then
+        return nil, "request failed: " .. tostring(err or "no response")
+    end
+
+    if response.status ~= 200 then
+        return nil, "HTTP " .. tostring(response.status) .. ": " .. tostring(response.body or "")
+    end
+
+    if response.body == nil or response.body == "" then
+        return nil, "empty response body"
+    end
+
+    local decoded, decode_err = decode_json(response.body)
+
+    if decode_err ~= nil then
+        return nil, decode_err
+    end
+
+    return decoded, nil
+end
+
+local function fetch_steamhunters_app(app_id)
+    local cached = get_cache(app_cache, app_id)
+
+    if cached ~= nil then
+        return cached, nil, true
+    end
+
+    local url = "https://steamhunters.com/api/apps/" .. tostring(app_id)
+    local data, err = request_json(url)
+
+    if err ~= nil then
+        return nil, err, false
+    end
+
+    if data.appId == nil then
+        return nil, "invalid app summary response, missing appId", false
+    end
+
+    local app = {
+        app_id = to_number(data.appId, app_id),
+        name = tostring(data.name or "Unknown game"),
+        achievement_count = to_number(data.achievementCount, 0),
+        median_completion_time = data.medianCompletionTime,
+        fastest_completion_time = data.fastestCompletionTime,
+        steam_db_rating = data.steamDbRating,
+        has_paid_dlc = to_boolean(data.hasPaidDlc),
+        is_restricted = to_boolean(data.isRestricted),
+        is_removed = to_boolean(data.isRemoved),
+        is_free = to_boolean(data.isFree)
+    }
+
+    set_cache(app_cache, app_id, app)
+
+    return app, nil, false
+end
+
+local function count_achievement_obtainability(achievements)
+    local result = {
+        total = 0,
+        obtainable = 0,
+        broken_but_obtainable = 0,
+        conditionally_obtainable = 0,
+        unobtainable = 0
+    }
+
+    if type(achievements) ~= "table" then
+        return result
+    end
+
+    for _, achievement in ipairs(achievements) do
+        if type(achievement) == "table" then
+            result.total = result.total + 1
+
+            local obtainability = to_number(achievement.obtainability, -1)
+
+            if obtainability == 0 then
+                result.obtainable = result.obtainable + 1
+            elseif obtainability == 1 then
+                result.broken_but_obtainable = result.broken_but_obtainable + 1
+            elseif obtainability == 2 then
+                result.conditionally_obtainable = result.conditionally_obtainable + 1
+            elseif obtainability == 3 then
+                result.unobtainable = result.unobtainable + 1
+            end
+        end
+    end
+
+    return result
+end
+
+local function fetch_steamhunters_achievements(app_id)
+    local cached = get_cache(achievements_cache, app_id)
+
+    if cached ~= nil then
+        return cached, nil, true
+    end
+
+    local url = "https://steamhunters.com/api/apps/" .. tostring(app_id) .. "/achievements"
+    local data, err = request_json(url)
+
+    if err ~= nil then
+        return nil, err, false
+    end
+
+    local counts = count_achievement_obtainability(data)
+
+    set_cache(achievements_cache, app_id, counts)
+
+    return counts, nil, false
+end
+
+local function make_error_response(app_id, page_kind, error_message)
+    return encode_json({
+        ok = false,
+        type = "completion_context",
+        source = "steamhunters",
+        app_id = to_number(app_id, 0),
+        page_kind = tostring(page_kind or "unknown"),
+        title = "Steam Completion Companion",
+        summary = "SteamHunters lookup failed: " .. tostring(error_message),
+        restricted_count = 0,
+        items = {
+            {
+                label = "Error",
+                value = tostring(error_message)
+            }
+        }
+    })
+end
+
+local function make_no_app_response(page_kind)
+    return encode_json({
+        ok = true,
+        type = "completion_context",
+        source = "steamhunters",
+        has_app = false,
+        page_kind = tostring(page_kind or "unknown"),
+        title = "Steam Completion Companion",
+        summary = "No app id detected on this page.",
+        restricted_count = 0,
+        items = {}
+    })
+end
+
+local function make_app_response(app, achievements, page_kind, app_from_cache, achievements_from_cache, achievements_error)
+    local achievement_total = to_number(app.achievement_count, 0)
+    local obtainable = 0
+    local broken_but_obtainable = 0
+    local conditionally_obtainable = 0
+    local unobtainable = 0
+
+    if achievements ~= nil then
+        achievement_total = to_number(achievements.total, achievement_total)
+        obtainable = to_number(achievements.obtainable, 0)
+        broken_but_obtainable = to_number(achievements.broken_but_obtainable, 0)
+        conditionally_obtainable = to_number(achievements.conditionally_obtainable, 0)
+        unobtainable = to_number(achievements.unobtainable, 0)
+    end
+
+    local warnings = {}
+
+    if app.has_paid_dlc == true then
+        table.insert(warnings, "Paid DLC")
+    end
+
+    if app.is_restricted == true then
+        table.insert(warnings, "Restricted")
+    end
+
+    if app.is_removed == true then
+        table.insert(warnings, "Removed")
+    end
+
+    if broken_but_obtainable > 0 then
+        table.insert(warnings, tostring(broken_but_obtainable) .. " broken but obtainable")
+    end
+
+    if conditionally_obtainable > 0 then
+        table.insert(warnings, tostring(conditionally_obtainable) .. " conditionally obtainable")
+    end
+
+    if unobtainable > 0 then
+        table.insert(warnings, tostring(unobtainable) .. " unobtainable")
+    end
+
+    local warning_summary = "No major warnings found."
+
+    if #warnings > 0 then
+        warning_summary = table.concat(warnings, ", ")
+    end
+
+    if achievements_error ~= nil then
+        warning_summary = warning_summary .. " Achievement detail lookup failed."
+    end
+
+    local items = {
+        {
+            label = "Game",
+            value = app.name
+        },
+        {
+            label = "Achievements total",
+            value = tostring(achievement_total)
+        },
+        {
+            label = "Obtainable",
+            value = tostring(obtainable)
+        },
+        {
+            label = "Broken but obtainable",
+            value = tostring(broken_but_obtainable)
+        },
+        {
+            label = "Conditionally obtainable",
+            value = tostring(conditionally_obtainable)
+        },
+        {
+            label = "Unobtainable",
+            value = tostring(unobtainable)
+        },
+        {
+            label = "Median completion",
+            value = format_minutes(app.median_completion_time)
+        },
+        {
+            label = "Paid DLC",
+            value = yes_no(app.has_paid_dlc)
+        },
+        {
+            label = "Restricted",
+            value = yes_no(app.is_restricted)
+        },
+        {
+            label = "SteamDB rating",
+            value = format_rating(app.steam_db_rating)
+        }
+    }
+
+    if achievements_error ~= nil then
+        table.insert(items, {
+            label = "Achievement detail error",
+            value = tostring(achievements_error)
+        })
+    end
+
+    return encode_json({
+        ok = true,
+        type = "completion_context",
+        source = "steamhunters",
+        has_app = true,
+        app_id = app.app_id,
+        page_kind = tostring(page_kind or "unknown"),
+        title = "Steam Completion Companion",
+        summary = "SteamHunters data loaded for " .. tostring(app.name) .. ". " .. warning_summary,
+        restricted_count = unobtainable,
+        items = items,
+        debug = {
+            app_cache = app_from_cache and true or false,
+            achievements_cache = achievements_from_cache and true or false
+        }
+    })
 end
 
 function shc_json_bridge(payload_json)
@@ -54,61 +423,52 @@ function shc_json_bridge(payload_json)
     log("payload_json value: " .. tostring(payload_json))
 
     if type(payload_json) ~= "string" then
-        local err = "expected JSON string, got " .. type(payload_json)
-        log("ERROR " .. err)
-
-        return "{"
-            .. "\"ok\":false,"
-            .. "\"type\":\"error\","
-            .. "\"error\":\"" .. escape_json_string(err) .. "\""
-            .. "}"
+        return make_error_response(0, "unknown", "expected JSON string, got " .. type(payload_json))
     end
 
-    local request_type = extract_json_string(payload_json, "type")
-    local source = extract_json_string(payload_json, "source")
-    local page_kind = extract_json_string(payload_json, "page_kind")
-    local app_id = extract_json_number(payload_json, "app_id")
-    local href = extract_json_string(payload_json, "href")
+    local payload, payload_err = decode_json(payload_json)
+
+    if payload_err ~= nil then
+        return make_error_response(0, "unknown", payload_err)
+    end
+
+    local request_type = tostring(payload.type or "")
+    local source = tostring(payload.source or "")
+    local page_kind = tostring(payload.page_kind or "unknown")
+    local app_id = to_number(payload.app_id, 0)
+    local href = tostring(payload.href or "")
 
     log("request_type: " .. request_type)
     log("source: " .. source)
     log("page_kind: " .. page_kind)
-    log("app_id: " .. app_id)
+    log("app_id: " .. tostring(app_id))
     log("href: " .. href)
 
-    if app_id == "" then
-        return "{"
-            .. "\"ok\":true,"
-            .. "\"type\":\"shc_page_info\","
-            .. "\"has_app\":false,"
-            .. "\"page_kind\":\"" .. escape_json_string(page_kind) .. "\","
-            .. "\"title\":\"SHC detected page\","
-            .. "\"summary\":\"No app id detected on this page yet.\","
-            .. "\"restricted_count\":0,"
-            .. "\"items\":[]"
-            .. "}"
+    if app_id <= 0 then
+        return make_no_app_response(page_kind)
     end
 
-    return "{"
-        .. "\"ok\":true,"
-        .. "\"type\":\"shc_page_info\","
-        .. "\"has_app\":true,"
-        .. "\"app_id\":" .. app_id .. ","
-        .. "\"page_kind\":\"" .. escape_json_string(page_kind) .. "\","
-        .. "\"title\":\"SteamHunters Companion\","
-        .. "\"summary\":\"Probe data loaded for app " .. escape_json_string(app_id) .. ". Store and Library bridge works.\","
-        .. "\"restricted_count\":2,"
-        .. "\"items\":["
-            .. "{"
-                .. "\"label\":\"Restricted achievements\","
-                .. "\"value\":\"2 fake entries\""
-            .. "},"
-            .. "{"
-                .. "\"label\":\"Detected context\","
-                .. "\"value\":\"" .. escape_json_string(page_kind) .. "\""
-            .. "}"
-        .. "]"
-        .. "}"
+    local app, app_err, app_from_cache = fetch_steamhunters_app(app_id)
+
+    if app_err ~= nil then
+        log("SteamHunters app summary error: " .. tostring(app_err))
+        return make_error_response(app_id, page_kind, app_err)
+    end
+
+    local achievements, achievements_err, achievements_from_cache = fetch_steamhunters_achievements(app_id)
+
+    if achievements_err ~= nil then
+        log("SteamHunters achievements error: " .. tostring(achievements_err))
+    end
+
+    return make_app_response(
+        app,
+        achievements,
+        page_kind,
+        app_from_cache,
+        achievements_from_cache,
+        achievements_err
+    )
 end
 
 local function on_load()
