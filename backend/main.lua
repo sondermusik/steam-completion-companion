@@ -352,6 +352,11 @@ local function make_app_response(app, achievements, page_kind, app_from_cache, a
         return make_hidden_response(app, page_kind)
     end
 
+    if to_number(app.achievement_count, 0) <= 0 then
+        log("hiding panel for game without achievements: " .. tostring(app.app_id))
+        return make_hidden_response(app, page_kind)
+    end
+
     local broken_but_obtainable = 0
     local conditionally_obtainable = 0
     local unobtainable = 0
@@ -365,7 +370,6 @@ local function make_app_response(app, achievements, page_kind, app_from_cache, a
     local items = {}
 
     add_item(items, "Median completion", format_minutes(app.median_completion_time), "median_completion")
-    add_item(items, "SteamDB rating", format_rating(app.steam_db_rating), "steamdb_rating")
     add_item(items, "Players perfected", tostring(to_number(app.players_perfected_count, 0)), "players_perfected")
     add_item(
         items,

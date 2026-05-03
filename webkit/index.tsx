@@ -8,6 +8,7 @@ type IPCParams = Record<string, IPCValue>;
 type ShcResponseItem = {
   label?: string;
   value?: string;
+  kind?: string;
 };
 
 type ShcResponse = {
@@ -98,6 +99,15 @@ function ensureStyle() {
       font-size: 13px;
       line-height: 1.35;
       clear: both;
+
+      --scc-accent: var(--gpColor-Blue, #66c0f4);
+      --scc-text: var(--gpStoreLightGrey, #c7d5e0);
+      --scc-muted: var(--gpStoreLighterGrey, #8f98a0);
+      --scc-card-bg: rgba(28, 28, 28, 0.92);
+      --scc-border: rgba(255, 255, 255, 0.08);
+      --scc-yellow: #ffcc66;
+      --scc-orange: #f39c12;
+      --scc-red: #ff6b6b;
     }
 
     #${PANEL_ID} * {
@@ -109,19 +119,19 @@ function ensureStyle() {
       box-sizing: border-box;
       padding: 6px 12px 5px 12px;
       border-radius: 8px;
-      background: rgba(28, 28, 28, 0.92);
+      background: var(--scc-card-bg);
       border: 1px solid rgba(255, 255, 255, 0.04);
       box-shadow: none;
     }
 
     #${PANEL_ID} .scc-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 12px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      column-gap: 12px;
       padding: 1px 0;
       min-height: 20px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid var(--scc-border);
     }
 
     #${PANEL_ID} .scc-row:first-child {
@@ -134,16 +144,24 @@ function ensureStyle() {
     }
 
     #${PANEL_ID} .scc-label {
-      color: #8f98a0;
+      color: var(--scc-muted);
       min-width: 0;
-      overflow-wrap: anywhere;
+      overflow: hidden;
     }
 
     #${PANEL_ID} .scc-label-wrap {
-      display: inline-flex;
+      display: inline-grid;
+      grid-template-columns: 14px minmax(0, auto);
       align-items: center;
-      gap: 6px;
+      column-gap: 6px;
       min-width: 0;
+      line-height: 18px;
+    }
+
+    #${PANEL_ID} .scc-label-wrap span:last-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     #${PANEL_ID} .scc-row-icon {
@@ -154,7 +172,6 @@ function ensureStyle() {
       align-items: center;
       justify-content: center;
       opacity: 0.95;
-      transform: translateY(1px);
     }
 
     #${PANEL_ID} .scc-row-icon svg {
@@ -165,51 +182,55 @@ function ensureStyle() {
       stroke: currentColor;
     }
 
+    #${PANEL_ID} .scc-native-icon {
+      width: 14px;
+      min-width: 14px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 14px;
+      color: currentColor;
+    }
+
     #${PANEL_ID} .scc-row-icon-normal {
-      color: #c7d5e0;
+      color: var(--scc-text);
     }
 
     #${PANEL_ID} .scc-row-icon-muted {
-      color: #8f98a0;
+      color: var(--scc-muted);
     }
 
     #${PANEL_ID} .scc-row-icon-yellow {
-      color: #ffcc66;
+      color: var(--scc-yellow);
     }
 
     #${PANEL_ID} .scc-row-icon-orange {
-      color: #f39c12;
+      color: var(--scc-orange);
     }
 
     #${PANEL_ID} .scc-row-icon-red {
-      color: #ff6b6b;
-    }
-
-    #${PANEL_ID} .scc-row-icon-blue {
-      color: #66c0f4;
+      color: var(--scc-red);
     }
 
     #${PANEL_ID} .scc-value {
-      color: #c7d5e0;
+      color: var(--scc-text);
       font-weight: 700;
       text-align: right;
       white-space: nowrap;
+      line-height: 18px;
+      min-height: 18px;
+      display: block;
     }
 
     #${PANEL_ID} .scc-value-yellow {
-      color: #ffcc66;
+      color: var(--scc-yellow);
     }
 
     #${PANEL_ID} .scc-value-orange {
-      color: #f39c12;
+      color: var(--scc-orange);
     }
 
     #${PANEL_ID} .scc-value-red {
-      color: #ff6b6b;
-    }
-
-    #${PANEL_ID} .scc-value-blue {
-      color: #66c0f4;
+      color: var(--scc-red);
     }
 
     #${PANEL_ID} .scc-error {
@@ -223,18 +244,18 @@ function ensureStyle() {
       align-items: center;
       margin-top: 6px;
       padding-top: 6px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid var(--scc-border);
     }
 
     #${PANEL_ID} .scc-link {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      color: #66c0f4;
+      color: var(--scc-accent);
       font-size: 12px;
       font-weight: 600;
       text-decoration: none;
-      opacity: 0.9;
+      opacity: 0.92;
     }
 
     #${PANEL_ID} .scc-link:hover {
@@ -258,7 +279,7 @@ function ensureStyle() {
       align-items: center;
       justify-content: center;
       border-radius: 3px;
-      background: #66c0f4;
+      background: var(--scc-accent);
       color: #0b141d;
       font-size: 7px;
       font-weight: 800;
@@ -313,15 +334,6 @@ function iconSvg(kind: string): string {
     `;
   }
 
-  if (kind === 'restricted') {
-    return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" fill="none" stroke-width="2"/>
-        <path d="M6.4 17.6 17.6 6.4" fill="none" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-    `;
-  }
-
   if (kind === 'star') {
     return `
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -367,69 +379,99 @@ function iconSvg(kind: string): string {
   `;
 }
 
-function getRowIcon(label: string): { kind: string; className: string } {
-  const lower = label.toLowerCase();
+function normalizeRowKind(item: ShcResponseItem): string {
+  const kind = String(item.kind || '').toLowerCase();
+  const label = String(item.label || '').toLowerCase();
 
-  if (lower.includes('paid dlc')) {
-    return { kind: 'dlc', className: 'scc-row-icon-yellow' };
+  if (kind === 'paid_dlc' || label.includes('paid dlc')) {
+    return 'paid_dlc';
   }
 
-  if (lower.includes('broken but obtainable')) {
-    return { kind: 'broken', className: 'scc-row-icon-yellow' };
+  if (kind === 'broken' || label.includes('broken but obtainable')) {
+    return 'broken';
   }
 
-  if (lower.includes('conditionally obtainable')) {
-    return { kind: 'conditional', className: 'scc-row-icon-orange' };
+  if (kind === 'conditional' || label.includes('conditionally obtainable')) {
+    return 'conditional';
   }
 
-  if (lower.includes('unobtainable')) {
-    return { kind: 'unobtainable', className: 'scc-row-icon-red' };
+  if (kind === 'unobtainable' || label.includes('unobtainable')) {
+    return 'unobtainable';
   }
 
-  if (lower.includes('restricted')) {
-    return { kind: 'restricted', className: 'scc-row-icon-yellow' };
+  if (kind === 'restricted' || label.includes('restricted')) {
+    return 'restricted';
   }
 
-  if (lower.includes('players perfected')) {
-    return { kind: 'star', className: 'scc-row-icon-normal' };
+  if (kind === 'players_perfected' || label.includes('players perfected')) {
+    return 'players_perfected';
   }
 
-  if (lower.includes('median completion')) {
-    return { kind: 'clock', className: 'scc-row-icon-normal' };
+  if (kind === 'median_completion' || label.includes('median completion')) {
+    return 'median_completion';
   }
 
-  if (lower.includes('steamdb rating')) {
-    return { kind: 'chart', className: 'scc-row-icon-normal' };
+  if (kind === 'perfected_by_starters' || label.includes('perfected by starters')) {
+    return 'perfected_by_starters';
   }
 
-  if (lower.includes('perfected by starters')) {
-    return { kind: 'percent', className: 'scc-row-icon-normal' };
+  if (kind === 'error' || label.includes('error')) {
+    return 'error';
   }
 
-  return { kind: 'info', className: 'scc-row-icon-muted' };
+  return 'info';
 }
 
-function getValueClass(label: string): string {
-  const lower = label.toLowerCase();
+function getIconHtml(rowKind: string): { html: string; className: string } {
+  if (rowKind === 'paid_dlc') {
+    return { html: iconSvg('dlc'), className: 'scc-row-icon-yellow' };
+  }
 
-  if (lower.includes('broken but obtainable')) {
+  if (rowKind === 'broken') {
+    return { html: iconSvg('broken'), className: 'scc-row-icon-yellow' };
+  }
+
+  if (rowKind === 'conditional') {
+    return { html: iconSvg('conditional'), className: 'scc-row-icon-orange' };
+  }
+
+  if (rowKind === 'unobtainable') {
+    return { html: iconSvg('unobtainable'), className: 'scc-row-icon-red' };
+  }
+
+  if (rowKind === 'restricted') {
+    return {
+      html: '<i class="icon icon-fw icon-spinner scc-native-icon" aria-hidden="true"></i>',
+      className: 'scc-row-icon-yellow',
+    };
+  }
+
+  if (rowKind === 'players_perfected') {
+    return { html: iconSvg('star'), className: 'scc-row-icon-normal' };
+  }
+
+  if (rowKind === 'median_completion') {
+    return { html: iconSvg('clock'), className: 'scc-row-icon-normal' };
+  }
+
+  if (rowKind === 'perfected_by_starters') {
+    return { html: iconSvg('percent'), className: 'scc-row-icon-normal' };
+  }
+
+  return { html: iconSvg('info'), className: 'scc-row-icon-muted' };
+}
+
+function getValueClass(rowKind: string): string {
+  if (rowKind === 'broken' || rowKind === 'paid_dlc' || rowKind === 'restricted') {
     return 'scc-value-yellow';
   }
 
-  if (lower.includes('conditionally obtainable')) {
+  if (rowKind === 'conditional') {
     return 'scc-value-orange';
   }
 
-  if (lower.includes('unobtainable')) {
+  if (rowKind === 'unobtainable') {
     return 'scc-value-red';
-  }
-
-  if (lower.includes('paid dlc')) {
-    return 'scc-value-yellow';
-  }
-
-  if (lower.includes('restricted')) {
-    return 'scc-value-yellow';
   }
 
   return '';
@@ -567,18 +609,18 @@ function renderResponse(response: ShcResponse) {
 
   if (Array.isArray(response.items)) {
     for (const item of response.items) {
-      const rawLabel = String(item.label || '');
-      const label = safeText(rawLabel);
+      const rowKind = normalizeRowKind(item);
+      const label = safeText(item.label);
       const value = safeText(item.value);
-      const icon = getRowIcon(rawLabel);
-      const valueClass = getValueClass(rawLabel);
+      const icon = getIconHtml(rowKind);
+      const valueClass = getValueClass(rowKind);
 
       rows.push(`
         <div class="scc-row">
           <div class="scc-label">
             <span class="scc-label-wrap">
               <span class="scc-row-icon ${icon.className}">
-                ${iconSvg(icon.kind)}
+                ${icon.html}
               </span>
               <span>${label}</span>
             </span>
