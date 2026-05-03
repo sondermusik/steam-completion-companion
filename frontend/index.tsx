@@ -16,6 +16,7 @@ type IPCParams = Record<string, IPCValue>;
 type ShcResponseItem = {
   label?: string;
   value?: string;
+  kind?: string;
 };
 
 type ShcResponse = {
@@ -48,7 +49,6 @@ const shcJsonBridge = callable<[params: IPCParams], string>('shc_json_bridge');
 
 const PANEL_ID = 'shc-companion-library-panel';
 const STYLE_ID = 'shc-companion-library-style';
-const FA_STYLE_ID = 'shc-font-awesome-style';
 
 const LIBRARY_PATH_PATTERN = /\/library\/app\/(\d+)/i;
 const GENERIC_APP_PATH_PATTERN = /\/app\/(\d+)/i;
@@ -233,14 +233,6 @@ function removePanel(doc: Document) {
 }
 
 function ensureStyle(doc: Document) {
-  if (!doc.getElementById(FA_STYLE_ID)) {
-    const fa = doc.createElement('link');
-    fa.id = FA_STYLE_ID;
-    fa.rel = 'stylesheet';
-    fa.href = 'https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css';
-    doc.head?.appendChild(fa);
-  }
-
   if (doc.getElementById(STYLE_ID)) {
     return;
   }
@@ -250,18 +242,19 @@ function ensureStyle(doc: Document) {
   style.textContent = `
     #${PANEL_ID} {
       position: absolute;
-      right: 18px;
-      top: 18px;
+      right: 16px;
+      top: auto;
+      bottom: 96px;
       z-index: 9999;
       width: 330px;
-      max-width: calc(100vw - 36px);
+      max-width: calc(100vw - 32px);
       box-sizing: border-box;
-      padding: 13px 14px 12px 14px;
-      border-radius: 12px;
+      padding: 11px 14px 10px 14px;
+      border-radius: 10px;
       color: #dfe3e6;
       background: rgba(13, 17, 22, 0.94);
-      border: 1px solid rgba(117, 174, 209, 0.38);
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(117, 174, 209, 0.35);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
       font-family: Arial, Helvetica, sans-serif;
       font-size: 13px;
       line-height: 1.35;
@@ -276,8 +269,10 @@ function ensureStyle(doc: Document) {
     #${PANEL_ID} .shc-row {
       display: flex;
       justify-content: space-between;
-      gap: 10px;
-      padding: 5px 0;
+      align-items: baseline;
+      gap: 12px;
+      padding: 4px 0;
+      min-height: 21px;
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
@@ -287,7 +282,7 @@ function ensureStyle(doc: Document) {
     }
 
     #${PANEL_ID} .shc-label {
-      color: #91a4b5;
+      color: #9fb0bf;
       min-width: 0;
       overflow-wrap: anywhere;
     }
@@ -295,46 +290,74 @@ function ensureStyle(doc: Document) {
     #${PANEL_ID} .shc-label-wrap {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
       min-width: 0;
     }
 
     #${PANEL_ID} .shc-row-icon {
       width: 14px;
+      height: 14px;
       min-width: 14px;
-      text-align: center;
-      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       opacity: 0.95;
+      transform: translateY(1px);
+    }
+
+    #${PANEL_ID} .shc-row-icon svg {
+      width: 13px;
+      height: 13px;
+      display: block;
+      fill: currentColor;
+      stroke: currentColor;
     }
 
     #${PANEL_ID} .shc-row-icon-normal {
-      color: #ffffff;
+      color: #c7d5e0;
     }
 
     #${PANEL_ID} .shc-row-icon-muted {
-      color: #91a4b5;
+      color: #8f98a0;
     }
 
-    #${PANEL_ID} .shc-row-icon-warning {
+    #${PANEL_ID} .shc-row-icon-yellow {
       color: #ffcc66;
     }
 
-    #${PANEL_ID} .shc-row-icon-broken {
-      color: #66c0f4;
+    #${PANEL_ID} .shc-row-icon-orange {
+      color: #f39c12;
     }
 
-    #${PANEL_ID} .shc-row-icon-conditional {
-      color: #f7c948;
-    }
-
-    #${PANEL_ID} .shc-row-icon-unobtainable {
+    #${PANEL_ID} .shc-row-icon-red {
       color: #ff6b6b;
+    }
+
+    #${PANEL_ID} .shc-row-icon-blue {
+      color: #66c0f4;
     }
 
     #${PANEL_ID} .shc-value {
       color: #ffffff;
+      font-weight: 700;
       text-align: right;
-      overflow-wrap: anywhere;
+      white-space: nowrap;
+    }
+
+    #${PANEL_ID} .shc-value-yellow {
+      color: #ffcc66;
+    }
+
+    #${PANEL_ID} .shc-value-orange {
+      color: #f39c12;
+    }
+
+    #${PANEL_ID} .shc-value-red {
+      color: #ff6b6b;
+    }
+
+    #${PANEL_ID} .shc-value-blue {
+      color: #66c0f4;
     }
 
     #${PANEL_ID} .shc-error {
@@ -346,7 +369,7 @@ function ensureStyle(doc: Document) {
       justify-content: flex-end;
       align-items: center;
       margin-top: 6px;
-      padding-top: 6px;
+      padding-top: 7px;
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
@@ -358,7 +381,7 @@ function ensureStyle(doc: Document) {
       font-size: 12px;
       font-weight: 600;
       text-decoration: none;
-      opacity: 0.9;
+      opacity: 0.95;
     }
 
     #${PANEL_ID} .shc-link:hover {
@@ -392,6 +415,14 @@ function ensureStyle(doc: Document) {
 
     #${PANEL_ID} .shc-link-icon-fallback-hidden {
       display: none;
+    }
+
+    @media (max-width: 900px) {
+      #${PANEL_ID} {
+        right: 12px;
+        bottom: 92px;
+        width: 310px;
+      }
     }
   `;
 
@@ -441,46 +472,227 @@ function parseBackendResponse(raw: string): ShcResponse {
   }
 }
 
-function getRowIconClass(label: string): string {
-  const lower = label.toLowerCase();
-
-  if (lower.includes('paid dlc')) {
-    return 'fa fa-shopping-cart shc-row-icon-warning';
+function iconSvg(kind: string): string {
+  if (kind === 'dlc') {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 18.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2Zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2ZM6.2 6l.7 3h9.7c.8 0 1.5.7 1.5 1.5 0 .2 0 .4-.1.6l-1.3 3.8c-.2.6-.8 1.1-1.4 1.1H8.1c-.7 0-1.3-.5-1.5-1.2L4.4 4.5H2V3h3.6l.7 3Z"/>
+      </svg>
+    `;
   }
 
-  if (lower.includes('broken but obtainable')) {
-    return 'fa fa-info-circle shc-row-icon-broken';
+  if (kind === 'broken') {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="none" stroke-width="2"/>
+        <path d="M11 10h2v7h-2z" stroke="none"/>
+        <circle cx="12" cy="7" r="1.2" stroke="none"/>
+      </svg>
+    `;
   }
 
-  if (lower.includes('conditionally obtainable')) {
-    return 'fa fa-warning shc-row-icon-conditional';
+  if (kind === 'conditional') {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3 22 20H2L12 3Z" fill="none" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M11 9h2v5h-2z" stroke="none"/>
+        <circle cx="12" cy="17" r="1.2" stroke="none"/>
+      </svg>
+    `;
   }
 
-  if (lower.includes('unobtainable')) {
-    return 'fa fa-exclamation-circle shc-row-icon-unobtainable';
+  if (kind === 'unobtainable') {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="none" stroke-width="2"/>
+        <path d="M11 6h2v8h-2z" stroke="none"/>
+        <circle cx="12" cy="17.5" r="1.2" stroke="none"/>
+      </svg>
+    `;
   }
 
-  if (lower.includes('restricted')) {
-    return 'fa fa-spinner shc-row-icon-warning';
+  if (kind === 'restricted') {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3a9 9 0 1 0 9 9" fill="none" stroke-width="2" stroke-linecap="round"/>
+        <path d="M20.2 6.8a9 9 0 0 0-3-2.4" fill="none" stroke-width="2" stroke-linecap="round"/>
+        <path d="M12 1.8v3.6M12 18.6v3.6M1.8 12h3.6M18.6 12h3.6M4.8 4.8l2.5 2.5M16.7 16.7l2.5 2.5M19.2 4.8l-2.5 2.5M7.3 16.7l-2.5 2.5" fill="none" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    `;
   }
 
-  if (lower.includes('players perfected')) {
-    return 'fa fa-star shc-row-icon-normal';
+  if (kind === 'star') {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m12 2.5 2.9 6 6.6 1-4.8 4.6 1.1 6.5L12 17.5l-5.8 3.1 1.1-6.5-4.8-4.6 6.6-1L12 2.5Z"/>
+      </svg>
+    `;
   }
 
-  if (lower.includes('median completion')) {
-    return 'fa fa-clock-o shc-row-icon-normal';
+  if (kind === 'clock') {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="none" stroke-width="2"/>
+        <path d="M12 7v5l3.2 2" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
   }
 
-  if (lower.includes('steamdb rating')) {
-    return 'fa fa-bar-chart shc-row-icon-normal';
+  if (kind === 'chart') {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 19h16" fill="none" stroke-width="2" stroke-linecap="round"/>
+        <path d="M6 17V9h3v8H6Zm5 0V5h3v12h-3Zm5 0v-6h3v6h-3Z" stroke="none"/>
+      </svg>
+    `;
   }
 
-  if (lower.includes('perfected by starters')) {
-    return 'fa fa-percent shc-row-icon-normal';
+  if (kind === 'percent') {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 18 18 6" fill="none" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="7.5" cy="7.5" r="2.2" fill="none" stroke-width="2"/>
+        <circle cx="16.5" cy="16.5" r="2.2" fill="none" stroke-width="2"/>
+      </svg>
+    `;
   }
 
-  return 'fa fa-info-circle shc-row-icon-muted';
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" fill="none" stroke-width="2"/>
+      <path d="M11 10h2v7h-2z" stroke="none"/>
+      <circle cx="12" cy="7" r="1.2" stroke="none"/>
+    </svg>
+  `;
+}
+
+function normalizeKind(item: ShcResponseItem): string {
+  const kind = String(item.kind || '').toLowerCase();
+  const label = String(item.label || '').toLowerCase();
+
+  if (kind === 'paid_dlc' || label.includes('paid dlc')) {
+    return 'paid_dlc';
+  }
+
+  if (kind === 'broken' || label.includes('broken but obtainable')) {
+    return 'broken';
+  }
+
+  if (kind === 'conditional' || label.includes('conditionally obtainable')) {
+    return 'conditional';
+  }
+
+  if (kind === 'unobtainable' || label.includes('unobtainable')) {
+    return 'unobtainable';
+  }
+
+  if (kind === 'restricted' || label.includes('restricted')) {
+    return 'restricted';
+  }
+
+  if (kind === 'players_perfected' || label.includes('players perfected')) {
+    return 'players_perfected';
+  }
+
+  if (kind === 'median_completion' || label.includes('median completion')) {
+    return 'median_completion';
+  }
+
+  if (kind === 'steamdb_rating' || label.includes('steamdb rating')) {
+    return 'steamdb_rating';
+  }
+
+  if (kind === 'perfected_by_starters' || label.includes('perfected by starters')) {
+    return 'perfected_by_starters';
+  }
+
+  return 'info';
+}
+
+function getRowVisual(item: ShcResponseItem): {
+  iconKind: string;
+  iconClass: string;
+  valueClass: string;
+} {
+  const kind = normalizeKind(item);
+
+  if (kind === 'paid_dlc') {
+    return {
+      iconKind: 'dlc',
+      iconClass: 'shc-row-icon-yellow',
+      valueClass: 'shc-value-yellow',
+    };
+  }
+
+  if (kind === 'broken') {
+    return {
+      iconKind: 'broken',
+      iconClass: 'shc-row-icon-yellow',
+      valueClass: 'shc-value-yellow',
+    };
+  }
+
+  if (kind === 'conditional') {
+    return {
+      iconKind: 'conditional',
+      iconClass: 'shc-row-icon-orange',
+      valueClass: 'shc-value-orange',
+    };
+  }
+
+  if (kind === 'unobtainable') {
+    return {
+      iconKind: 'unobtainable',
+      iconClass: 'shc-row-icon-red',
+      valueClass: 'shc-value-red',
+    };
+  }
+
+  if (kind === 'restricted') {
+    return {
+      iconKind: 'restricted',
+      iconClass: 'shc-row-icon-yellow',
+      valueClass: 'shc-value-yellow',
+    };
+  }
+
+  if (kind === 'players_perfected') {
+    return {
+      iconKind: 'star',
+      iconClass: 'shc-row-icon-normal',
+      valueClass: '',
+    };
+  }
+
+  if (kind === 'median_completion') {
+    return {
+      iconKind: 'clock',
+      iconClass: 'shc-row-icon-normal',
+      valueClass: '',
+    };
+  }
+
+  if (kind === 'steamdb_rating') {
+    return {
+      iconKind: 'chart',
+      iconClass: 'shc-row-icon-normal',
+      valueClass: '',
+    };
+  }
+
+  if (kind === 'perfected_by_starters') {
+    return {
+      iconKind: 'percent',
+      iconClass: 'shc-row-icon-normal',
+      valueClass: '',
+    };
+  }
+
+  return {
+    iconKind: 'info',
+    iconClass: 'shc-row-icon-muted',
+    valueClass: '',
+  };
 }
 
 function renderResponse(
@@ -499,18 +711,19 @@ function renderResponse(
 
   if (Array.isArray(response.items)) {
     for (const item of response.items) {
-      const rawLabel = String(item.label || '');
-      const iconClass = `${getRowIconClass(rawLabel)} shc-row-icon`;
+      const visual = getRowVisual(item);
 
       rows.push(`
         <div class="shc-row">
           <div class="shc-label">
             <span class="shc-label-wrap">
-              <i class="${safeText(iconClass)}" aria-hidden="true"></i>
+              <span class="shc-row-icon ${visual.iconClass}">
+                ${iconSvg(visual.iconKind)}
+              </span>
               <span>${safeText(item.label)}</span>
             </span>
           </div>
-          <div class="shc-value">${safeText(item.value)}</div>
+          <div class="shc-value ${visual.valueClass}">${safeText(item.value)}</div>
         </div>
       `);
     }
