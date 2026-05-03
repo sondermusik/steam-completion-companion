@@ -20,6 +20,7 @@ type ShcResponseItem = {
 
 type ShcResponse = {
   ok?: boolean;
+  show_panel?: boolean;
   type?: string;
   has_app?: boolean;
   app_id?: number;
@@ -350,21 +351,8 @@ function getOrCreatePanel(doc: Document, container: HTMLElement): HTMLElement {
   return panel;
 }
 
-function renderLoading(doc: Document, container: HTMLElement, appId: number, reason: string) {
-  const panel = getOrCreatePanel(doc, container);
-
-  panel.innerHTML = `
-    <div class="shc-head">
-      <div class="shc-title">SteamHunters Companion</div>
-      <div class="shc-badge">library</div>
-    </div>
-    <div class="shc-summary">Loading library probe info...</div>
-    <div class="shc-row">
-      <div class="shc-label">App ID</div>
-      <div class="shc-value">${safeText(appId)}</div>
-    </div>
-    <div class="shc-small">reason=${safeText(reason)}</div>
-  `;
+function renderLoading(doc: Document, _container: HTMLElement, _appId: number, _reason: string) {
+  removePanel(doc);
 }
 
 function parseBackendResponse(raw: string): ShcResponse {
@@ -374,7 +362,7 @@ function parseBackendResponse(raw: string): ShcResponse {
     return {
       ok: false,
       type: 'parse_error',
-      title: 'SteamHunters Companion',
+      title: 'Steam Completion Companion',
       summary: 'Backend returned non JSON response.',
       restricted_count: 0,
       items: [],
@@ -386,38 +374,16 @@ function parseBackendResponse(raw: string): ShcResponse {
 function renderResponse(
   doc: Document,
   container: HTMLElement,
-  appId: number,
-  reason: string,
+  _appId: number,
+  _reason: string,
   response: ShcResponse
 ) {
-  const panel = getOrCreatePanel(doc, container);
-
-  const title = safeText(response.title || 'SteamHunters Companion');
-  const summary = safeText(response.summary || 'No summary.');
-  const restrictedCount = response.restricted_count ?? 0;
+  if (response.show_panel === false) {
+    removePanel(doc);
+    return;
+  }
 
   const rows: string[] = [];
-
-  rows.push(`
-    <div class="shc-row">
-      <div class="shc-label">App ID</div>
-      <div class="shc-value">${safeText(appId)}</div>
-    </div>
-  `);
-
-  rows.push(`
-    <div class="shc-row">
-      <div class="shc-label">Restricted</div>
-      <div class="shc-value">${safeText(restrictedCount)}</div>
-    </div>
-  `);
-
-  rows.push(`
-    <div class="shc-row">
-      <div class="shc-label">Context</div>
-      <div class="shc-value">library</div>
-    </div>
-  `);
 
   if (Array.isArray(response.items)) {
     for (const item of response.items) {
@@ -430,15 +396,14 @@ function renderResponse(
     }
   }
 
-  panel.innerHTML = `
-    <div class="shc-head">
-      <div class="shc-title">${title}</div>
-      <div class="shc-badge">library</div>
-    </div>
-    <div class="shc-summary">${summary}</div>
-    ${rows.join('')}
-    <div class="shc-small">reason=${safeText(reason)}</div>
-  `;
+  if (rows.length === 0) {
+    removePanel(doc);
+    return;
+  }
+
+  const panel = getOrCreatePanel(doc, container);
+
+  panel.innerHTML = rows.join('');
 }
 
 function renderError(
@@ -691,7 +656,7 @@ export default definePlugin(() => {
   });
 
   return {
-    title: 'SHC Probe',
+    title: 'Steam Completion Companion',
     icon: <IconsModule.Settings />,
     content: <ProbeContent />,
   };

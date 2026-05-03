@@ -48,23 +48,11 @@ local function to_boolean(value)
     return nil
 end
 
-local function yes_no(value)
-    if value == true then
-        return "Yes"
-    end
-
-    if value == false then
-        return "No"
-    end
-
-    return "Unknown"
-end
-
 local function format_minutes(value)
     local minutes = tonumber(value)
 
     if minutes == nil or minutes <= 0 then
-        return "Unknown"
+        return nil
     end
 
     minutes = math.floor(minutes + 0.5)
@@ -87,10 +75,21 @@ local function format_rating(value)
     local rating = tonumber(value)
 
     if rating == nil then
-        return "Unknown"
+        return nil
     end
 
     return string.format("%.1f%%", rating)
+end
+
+local function format_percent_of_starters(perfected, started)
+    local p = tonumber(perfected)
+    local s = tonumber(started)
+
+    if p == nil or s == nil or s <= 0 then
+        return nil
+    end
+
+    return string.format("%.1f%% of starters", (p / s) * 100)
 end
 
 local function decode_json(text)
@@ -195,10 +194,14 @@ local function fetch_steamhunters_app(app_id)
     local app = {
         app_id = to_number(data.appId, app_id),
         name = tostring(data.name or "Unknown game"),
+        type = to_number(data.type, 0),
+        type_string = tostring(data.typeString or ""),
         achievement_count = to_number(data.achievementCount, 0),
         median_completion_time = data.medianCompletionTime,
         fastest_completion_time = data.fastestCompletionTime,
         steam_db_rating = data.steamDbRating,
+        players_perfected_count = to_number(data.playersPerfectedCount, 0),
+        players_started_count = to_number(data.playersStartedCount, 0),
         has_paid_dlc = to_boolean(data.hasPaidDlc),
         is_restricted = to_boolean(data.isRestricted),
         is_removed = to_boolean(data.isRemoved),
@@ -265,6 +268,31 @@ local function fetch_steamhunters_achievements(app_id)
     return counts, nil, false
 end
 
+local function add_item(items, label, value)
+    if value == nil then
+        return
+    end
+
+    if tostring(value) == "" then
+        return
+    end
+
+    table.insert(items, {
+        label = label,
+        value = tostring(value)
+    })
+end
+
+local function add_count_if_positive(items, label, value)
+    local count = to_number(value, 0)
+
+    if count <= 0 then
+        return
+    end
+
+    add_item(items, label, tostring(count))
+end
+
 local function make_error_response(app_id, page_kind, error_message)
     return encode_json({
         ok = false,
@@ -298,116 +326,76 @@ local function make_no_app_response(page_kind)
     })
 end
 
-local function make_app_response(app, achievements, page_kind, app_from_cache, achievements_from_cache, achievements_error)
-    local achievement_total = to_number(app.achievement_count, 0)
-    local obtainable = 0
-    local broken_but_obtainable = 0
-    local conditionally_obtainable = 0
-    local unobtainable = 0
-
-    if achievements ~= nil then
-        achievement_total = to_number(achievements.total, achievement_total)
-        obtainable = to_number(achievements.obtainable, 0)
-        broken_but_obtainable = to_number(achievements.broken_but_obtainable, 0)
-        conditionally_obtainable = to_number(achievements.conditionally_obtainable, 0)
-        unobtainable = to_number(achievements.unobtainable, 0)
-    end
-
-    local warnings = {}
-
-    if app.has_paid_dlc == true then
-        table.insert(warnings, "Paid DLC")
-    end
-
-    if app.is_restricted == true then
-        table.insert(warnings, "Restricted")
-    end
-
-    if app.is_removed == true then
-        table.insert(warnings, "Removed")
-    end
-
-    if broken_but_obtainable > 0 then
-        table.insert(warnings, tostring(broken_but_obtainable) .. " broken but obtainable")
-    end
-
-    if conditionally_obtainable > 0 then
-        table.insert(warnings, tostring(conditionally_obtainable) .. " conditionally obtainable")
-    end
-
-    if unobtainable > 0 then
-        table.insert(warnings, tostring(unobtainable) .. " unobtainable")
-    end
-
-    local warning_summary = "No major warnings found."
-
-    if #warnings > 0 then
-        warning_summary = table.concat(warnings, ", ")
-    end
-
-    if achievements_error ~= nil then
-        warning_summary = warning_summary .. " Achievement detail lookup failed."
-    end
-
-    local items = {
-        {
-            label = "Game",
-            value = app.name
-        },
-        {
-            label = "Achievements total",
-            value = tostring(achievement_total)
-        },
-        {
-            label = "Obtainable",
-            value = tostring(obtainable)
-        },
-        {
-            label = "Broken but obtainable",
-            value = tostring(broken_but_obtainable)
-        },
-        {
-            label = "Conditionally obtainable",
-            value = tostring(conditionally_obtainable)
-        },
-        {
-            label = "Unobtainable",
-            value = tostring(unobtainable)
-        },
-        {
-            label = "Median completion",
-            value = format_minutes(app.median_completion_time)
-        },
-        {
-            label = "Paid DLC",
-            value = yes_no(app.has_paid_dlc)
-        },
-        {
-            label = "Restricted",
-            value = yes_no(app.is_restricted)
-        },
-        {
-            label = "SteamDB rating",
-            value = format_rating(app.steam_db_rating)
-        }
-    }
-
-    if achievements_error ~= nil then
-        table.insert(items, {
-            label = "Achievement detail error",
-            value = tostring(achievements_error)
-        })
-    end
-
+local function make_hidden_response(app, page_kind)
     return encode_json({
         ok = true,
+        show_panel = false,
         type = "completion_context",
         source = "steamhunters",
         has_app = true,
         app_id = app.app_id,
         page_kind = tostring(page_kind or "unknown"),
         title = "Steam Completion Companion",
-        summary = "SteamHunters data loaded for " .. tostring(app.name) .. ". " .. warning_summary,
+        summary = "",
+        restricted_count = 0,
+        items = {}
+    })
+end
+
+local function make_app_response(app, achievements, page_kind, app_from_cache, achievements_from_cache, achievements_error)
+    if app.type_string ~= "Game" then
+        log("hiding panel for non-game app type: " .. tostring(app.type_string))
+        return make_hidden_response(app, page_kind)
+    end
+
+    local broken_but_obtainable = 0
+    local conditionally_obtainable = 0
+    local unobtainable = 0
+
+    if achievements ~= nil then
+        broken_but_obtainable = to_number(achievements.broken_but_obtainable, 0)
+        conditionally_obtainable = to_number(achievements.conditionally_obtainable, 0)
+        unobtainable = to_number(achievements.unobtainable, 0)
+    end
+
+    local items = {}
+
+    add_item(items, "Median completion", format_minutes(app.median_completion_time))
+    add_item(items, "SteamDB rating", format_rating(app.steam_db_rating))
+
+    add_item(items, "Players perfected", tostring(to_number(app.players_perfected_count, 0)))
+    add_item(
+        items,
+        "Perfected by starters",
+        format_percent_of_starters(app.players_perfected_count, app.players_started_count)
+    )
+
+    if app.has_paid_dlc == true then
+        add_item(items, "Paid DLC", "Yes")
+    end
+
+    if app.is_restricted == true then
+        add_item(items, "Restricted", "Yes")
+    end
+
+    add_count_if_positive(items, "Broken but obtainable", broken_but_obtainable)
+    add_count_if_positive(items, "Conditionally obtainable", conditionally_obtainable)
+    add_count_if_positive(items, "Unobtainable", unobtainable)
+
+    if achievements_error ~= nil then
+        add_item(items, "Achievement detail error", achievements_error)
+    end
+
+    return encode_json({
+        ok = true,
+        show_panel = true,
+        type = "completion_context",
+        source = "steamhunters",
+        has_app = true,
+        app_id = app.app_id,
+        page_kind = tostring(page_kind or "unknown"),
+        title = "Steam Completion Companion",
+        summary = "",
         restricted_count = unobtainable,
         items = items,
         debug = {

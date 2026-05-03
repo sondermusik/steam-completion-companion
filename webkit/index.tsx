@@ -12,6 +12,7 @@ type ShcResponseItem = {
 
 type ShcResponse = {
   ok?: boolean;
+  show_panel?: boolean;
   type?: string;
   has_app?: boolean;
   app_id?: number;
@@ -150,6 +151,11 @@ function ensureStyle() {
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
+    #${PANEL_ID} .shc-row:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
     #${PANEL_ID} .shc-label {
       color: #91a4b5;
     }
@@ -193,20 +199,8 @@ function getOrCreatePanel(): HTMLElement {
   return panel;
 }
 
-function renderLoading(appId: number) {
-  const panel = getOrCreatePanel();
-
-  panel.innerHTML = `
-    <div class="shc-head">
-      <div class="shc-title">SteamHunters Companion</div>
-      <div class="shc-badge">store</div>
-    </div>
-    <div class="shc-summary">Loading store probe info...</div>
-    <div class="shc-row">
-      <div class="shc-label">App ID</div>
-      <div class="shc-value">${safeText(appId)}</div>
-    </div>
-  `;
+function renderLoading(_appId: number) {
+  removePanel();
 }
 
 function parseBackendResponse(raw: string): ShcResponse {
@@ -216,7 +210,7 @@ function parseBackendResponse(raw: string): ShcResponse {
     return {
       ok: false,
       type: 'parse_error',
-      title: 'SteamHunters Companion',
+      title: 'Steam Completion Companion',
       summary: 'Backend returned non JSON response.',
       restricted_count: 0,
       items: [],
@@ -225,35 +219,13 @@ function parseBackendResponse(raw: string): ShcResponse {
   }
 }
 
-function renderResponse(appId: number, response: ShcResponse) {
-  const panel = getOrCreatePanel();
-
-  const title = safeText(response.title || 'SteamHunters Companion');
-  const summary = safeText(response.summary || 'No summary.');
-  const restrictedCount = response.restricted_count ?? 0;
+function renderResponse(_appId: number, response: ShcResponse) {
+  if (response.show_panel === false) {
+    removePanel();
+    return;
+  }
 
   const rows: string[] = [];
-
-  rows.push(`
-    <div class="shc-row">
-      <div class="shc-label">App ID</div>
-      <div class="shc-value">${safeText(appId)}</div>
-    </div>
-  `);
-
-  rows.push(`
-    <div class="shc-row">
-      <div class="shc-label">Restricted</div>
-      <div class="shc-value">${safeText(restrictedCount)}</div>
-    </div>
-  `);
-
-  rows.push(`
-    <div class="shc-row">
-      <div class="shc-label">Context</div>
-      <div class="shc-value">store</div>
-    </div>
-  `);
 
   if (Array.isArray(response.items)) {
     for (const item of response.items) {
@@ -266,15 +238,14 @@ function renderResponse(appId: number, response: ShcResponse) {
     }
   }
 
-  panel.innerHTML = `
-    <div class="shc-head">
-      <div class="shc-title">${title}</div>
-      <div class="shc-badge">store</div>
-    </div>
-    <div class="shc-summary">${summary}</div>
-    ${rows.join('')}
-    <div class="shc-small">reason=store_url_app_only</div>
-  `;
+  if (rows.length === 0) {
+    removePanel();
+    return;
+  }
+
+  const panel = getOrCreatePanel();
+
+  panel.innerHTML = rows.join('');
 }
 
 function renderError(appId: number, message: string) {
