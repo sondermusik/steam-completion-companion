@@ -1,6 +1,6 @@
 import { callable } from '@steambrew/webkit';
 
-const NS = '[SHC_WEBKIT]';
+const NS = '[SCC_WEBKIT]';
 
 type IPCValue = string | number | boolean | null;
 type IPCParams = Record<string, IPCValue>;
@@ -26,8 +26,8 @@ type ShcResponse = {
 
 const shcJsonBridge = callable<[params: IPCParams], string>('shc_json_bridge');
 
-const PANEL_ID = 'shc-companion-store-panel';
-const STYLE_ID = 'shc-companion-store-style';
+const PANEL_ID = 'scc-store-panel';
+const STYLE_ID = 'scc-store-style';
 const STORE_APP_PATTERN = /store\.steampowered\.com\/app\/(\d+)/i;
 
 let lastAppId: number | null = null;
@@ -88,119 +88,180 @@ function ensureStyle() {
   style.id = STYLE_ID;
   style.textContent = `
     #${PANEL_ID} {
-      position: fixed;
-      right: 18px;
-      bottom: 18px;
-      z-index: 2147483647;
-      width: 330px;
-      max-width: calc(100vw - 36px);
+      width: 100%;
       box-sizing: border-box;
-      padding: 13px 14px 12px 14px;
-      border-radius: 12px;
-      color: #dfe3e6;
-      background: rgba(13, 17, 22, 0.94);
-      border: 1px solid rgba(117, 174, 209, 0.38);
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
-      font-family: Arial, Helvetica, sans-serif;
+      margin: 2px 0;
+      padding: 0;
+      color: var(--gpStoreLightGrey, #c7d5e0);
+      font-family: Motiva Sans, Arial, Helvetica, sans-serif;
       font-size: 13px;
       line-height: 1.35;
-      pointer-events: auto;
-      backdrop-filter: blur(10px);
+      clear: both;
     }
 
     #${PANEL_ID} * {
       box-sizing: border-box;
     }
 
-    #${PANEL_ID} .shc-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 8px;
+    #${PANEL_ID} .scc-card {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 12px 5px 12px;
+      border-radius: 8px;
+      background: rgba(28, 28, 28, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      box-shadow: none;
     }
 
-    #${PANEL_ID} .shc-title {
-      font-weight: 700;
-      font-size: 13px;
-      color: #ffffff;
-      letter-spacing: 0.2px;
-    }
-
-    #${PANEL_ID} .shc-badge {
-      padding: 2px 7px;
-      border-radius: 999px;
-      color: #9fd4ff;
-      background: rgba(74, 144, 196, 0.18);
-      border: 1px solid rgba(126, 189, 232, 0.22);
-      font-size: 11px;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-
-    #${PANEL_ID} .shc-summary {
-      color: #c9d3dc;
-      margin-bottom: 9px;
-    }
-
-    #${PANEL_ID} .shc-row {
+    #${PANEL_ID} .scc-row {
       display: flex;
       justify-content: space-between;
-      gap: 10px;
-      padding: 5px 0;
+      align-items: baseline;
+      gap: 12px;
+      padding: 1px 0;
+      min-height: 20px;
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    #${PANEL_ID} .shc-row:first-child {
+    #${PANEL_ID} .scc-row:first-child {
       border-top: 0;
       padding-top: 0;
     }
 
-    #${PANEL_ID} .shc-label {
-      color: #91a4b5;
+    #${PANEL_ID} .scc-row:last-child {
+      padding-bottom: 0;
     }
 
-    #${PANEL_ID} .shc-value {
-      color: #ffffff;
+    #${PANEL_ID} .scc-label {
+      color: #8f98a0;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    #${PANEL_ID} .scc-value {
+      color: #c7d5e0;
+      font-weight: 700;
       text-align: right;
-      overflow-wrap: anywhere;
+      white-space: nowrap;
     }
 
-    #${PANEL_ID} .shc-error {
+    #${PANEL_ID} .scc-value-warning {
+      color: #ffcc66;
+    }
+
+    #${PANEL_ID} .scc-error {
       color: #ffb4b4;
-    }
-
-    #${PANEL_ID} .shc-small {
-      margin-top: 9px;
-      color: #6f8394;
-      font-size: 11px;
-      overflow-wrap: anywhere;
+      padding: 4px 0;
     }
   `;
 
   document.documentElement.appendChild(style);
 }
 
-function getOrCreatePanel(): HTMLElement {
+function findFeatureMetadataBlock(): HTMLElement | null {
+  const directBlockSelectors = [
+    '.block.responsive_apppage_details_right',
+    '.game_area_details_specs_ctn',
+    '.game_area_details_specs',
+    '#category_block',
+  ];
+
+  for (const selector of directBlockSelectors) {
+    const element = document.querySelector<HTMLElement>(selector);
+
+    if (!element) {
+      continue;
+    }
+
+    const block = element.closest<HTMLElement>('.block.responsive_apppage_details_right');
+
+    if (block) {
+      return block;
+    }
+
+    return element;
+  }
+
+  const links = Array.from(document.querySelectorAll<HTMLElement>('a, div, span'));
+
+  for (const element of links) {
+    const text = String(element.textContent || '').trim().toLowerCase();
+
+    if (
+      text.includes('singleplayer') ||
+      text.includes('einzelspieler') ||
+      text.includes('steam achievements') ||
+      text.includes('steam-errungenschaften') ||
+      text.includes('steam cloud')
+    ) {
+      const block =
+        element.closest<HTMLElement>('.block.responsive_apppage_details_right') ||
+        element.closest<HTMLElement>('.game_area_details_specs_ctn') ||
+        element.closest<HTMLElement>('.game_area_details_specs');
+
+      if (block) {
+        return block;
+      }
+    }
+  }
+
+  return null;
+}
+
+function findStoreInsertionParentAndReference(): {
+  parent: HTMLElement;
+  reference: HTMLElement;
+} | null {
+  const featureBlock = findFeatureMetadataBlock();
+
+  if (!featureBlock) {
+    return null;
+  }
+
+  const parent = featureBlock.parentElement;
+
+  if (!parent) {
+    return null;
+  }
+
+  return {
+    parent,
+    reference: featureBlock,
+  };
+}
+
+function getOrCreatePanel(): HTMLElement | null {
   ensureStyle();
+
+  const placement = findStoreInsertionParentAndReference();
+
+  if (!placement) {
+    return null;
+  }
 
   const existing = document.getElementById(PANEL_ID);
 
   if (existing) {
+    if (existing.parentElement !== placement.parent) {
+      placement.parent.insertBefore(existing, placement.reference);
+    } else {
+      const currentNext = existing.nextElementSibling;
+
+      if (currentNext !== placement.reference) {
+        placement.parent.insertBefore(existing, placement.reference);
+      }
+    }
+
     return existing;
   }
 
   const panel = document.createElement('div');
   panel.id = PANEL_ID;
-  panel.setAttribute('data-shc-store-panel', '1');
+  panel.setAttribute('data-scc-store-panel', '1');
 
-  document.documentElement.appendChild(panel);
+  placement.parent.insertBefore(panel, placement.reference);
 
   return panel;
-}
-
-function renderLoading(_appId: number) {
-  removePanel();
 }
 
 function parseBackendResponse(raw: string): ShcResponse {
@@ -219,7 +280,20 @@ function parseBackendResponse(raw: string): ShcResponse {
   }
 }
 
-function renderResponse(_appId: number, response: ShcResponse) {
+function isWarningRow(label: string): boolean {
+  const lower = label.toLowerCase();
+
+  return (
+    lower.includes('paid dlc') ||
+    lower.includes('restricted') ||
+    lower.includes('broken') ||
+    lower.includes('conditionally') ||
+    lower.includes('unobtainable') ||
+    lower.includes('error')
+  );
+}
+
+function renderResponse(response: ShcResponse) {
   if (response.show_panel === false) {
     removePanel();
     return;
@@ -229,10 +303,14 @@ function renderResponse(_appId: number, response: ShcResponse) {
 
   if (Array.isArray(response.items)) {
     for (const item of response.items) {
+      const label = safeText(item.label);
+      const value = safeText(item.value);
+      const warningClass = isWarningRow(String(item.label || '')) ? ' scc-value-warning' : '';
+
       rows.push(`
-        <div class="shc-row">
-          <div class="shc-label">${safeText(item.label)}</div>
-          <div class="shc-value">${safeText(item.value)}</div>
+        <div class="scc-row">
+          <div class="scc-label">${label}</div>
+          <div class="scc-value${warningClass}">${value}</div>
         </div>
       `);
     }
@@ -245,21 +323,28 @@ function renderResponse(_appId: number, response: ShcResponse) {
 
   const panel = getOrCreatePanel();
 
-  panel.innerHTML = rows.join('');
-}
-
-function renderError(appId: number, message: string) {
-  const panel = getOrCreatePanel();
+  if (!panel) {
+    log('store insertion target missing');
+    return;
+  }
 
   panel.innerHTML = `
-    <div class="shc-head">
-      <div class="shc-title">SteamHunters Companion</div>
-      <div class="shc-badge">store</div>
+    <div class="scc-card">
+      ${rows.join('')}
     </div>
-    <div class="shc-summary shc-error">${safeText(message)}</div>
-    <div class="shc-row">
-      <div class="shc-label">App ID</div>
-      <div class="shc-value">${safeText(appId)}</div>
+  `;
+}
+
+function renderError(message: string) {
+  const panel = getOrCreatePanel();
+
+  if (!panel) {
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="scc-card">
+      <div class="scc-error">${safeText(message)}</div>
     </div>
   `;
 }
@@ -273,7 +358,22 @@ async function updateStorePanel(reason: string) {
     return;
   }
 
-  if (appId === lastAppId && reason !== 'manual') {
+  const existing = document.getElementById(PANEL_ID);
+
+  if (appId === lastAppId && existing && reason !== 'manual') {
+    const placement = findStoreInsertionParentAndReference();
+
+    if (placement && existing.parentElement !== placement.parent) {
+      placement.parent.insertBefore(existing, placement.reference);
+    }
+
+    return;
+  }
+
+  const placement = findStoreInsertionParentAndReference();
+
+  if (!placement) {
+    log('store app detected but insertion target missing', appId);
     return;
   }
 
@@ -281,7 +381,7 @@ async function updateStorePanel(reason: string) {
 
   log('detected store app page', appId);
 
-  renderLoading(appId);
+  removePanel();
 
   const payload = {
     type: 'get_page_info',
@@ -301,10 +401,10 @@ async function updateStorePanel(reason: string) {
 
     const response = parseBackendResponse(String(raw));
 
-    renderResponse(appId, response);
+    renderResponse(response);
   } catch (err) {
     warn('backend call failed', err);
-    renderError(appId, err instanceof Error ? err.message : String(err));
+    renderError(err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -339,10 +439,23 @@ function installHistoryHooks() {
   window.addEventListener('hashchange', () => scheduleUpdate('hash_change'));
 }
 
+function installDomObserver() {
+  const observer = new MutationObserver(() => {
+    scheduleUpdate('dom_mutation');
+  });
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+}
+
 function boot() {
   log('webkit boot', window.location.href);
 
   installHistoryHooks();
+  installDomObserver();
+
   scheduleUpdate('boot');
 
   window.setInterval(() => {
