@@ -34,6 +34,22 @@ type ShcResponse = {
   error?: string;
 };
 
+type Rgba = {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+};
+
+type LibraryPillTheme = {
+  background: string;
+  rowBorder: string;
+  text: string;
+  muted: string;
+  accent: string;
+  shadow: string;
+};
+
 declare global {
   interface Window {
     MainWindowBrowserManager?: {
@@ -60,6 +76,7 @@ let observer: MutationObserver | null = null;
 let refreshTimer: number | null = null;
 let lastAppId: number | null = null;
 let processingAppId: number | null = null;
+let libraryIntervalId: number | null = null;
 
 function log(...args: unknown[]) {
   console.log(NS, ...args);
@@ -249,24 +266,26 @@ function ensureStyle(doc: Document) {
       width: 330px;
       max-width: calc(100vw - 32px);
       box-sizing: border-box;
-      padding: 11px 14px 10px 14px;
-      border-radius: 10px;
+      padding: 11px 14px 7px 14px;
+      border-radius: 9px;
       color: var(--shc-text, #dfe3e6);
-      background: var(--shc-panel-bg, rgba(13, 17, 22, 0.94));
-      border: 1px solid var(--shc-border, rgba(117, 174, 209, 0.35));
-      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
+      background: var(--shc-panel-bg, rgba(36, 43, 47, 0.82));
+      border: 0;
+      box-shadow: var(--shc-shadow, 0 12px 28px rgba(0, 0, 0, 0.38));
       font-family: Arial, Helvetica, sans-serif;
       font-size: 13px;
       line-height: 1.35;
       pointer-events: auto;
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
 
       --shc-accent: #66c0f4;
-      --shc-text: #dfe3e6;
-      --shc-muted: #9fb0bf;
-      --shc-panel-bg: rgba(13, 17, 22, 0.94);
-      --shc-border: rgba(117, 174, 209, 0.35);
-      --shc-row-border: rgba(255, 255, 255, 0.08);
+      --shc-link-accent: #66c0f4;
+      --shc-text: #ffffff;
+      --shc-muted: rgba(255, 255, 255, 0.78);
+      --shc-panel-bg: rgba(36, 43, 47, 0.82);
+      --shc-row-border: rgba(255, 255, 255, 0.105);
+      --shc-shadow: 0 12px 28px rgba(0, 0, 0, 0.38);
       --shc-yellow: #ffcc66;
       --shc-orange: #f39c12;
       --shc-red: #ff6b6b;
@@ -283,6 +302,7 @@ function ensureStyle(doc: Document) {
       column-gap: 12px;
       padding: 4px 0;
       min-height: 21px;
+      line-height: 20px;
       border-top: 1px solid var(--shc-row-border);
     }
 
@@ -294,32 +314,42 @@ function ensureStyle(doc: Document) {
     #${PANEL_ID} .shc-label {
       color: var(--shc-muted);
       min-width: 0;
+      height: 20px;
+      line-height: 20px;
       overflow: hidden;
+      display: flex;
+      align-items: center;
+      font-weight: 500;
     }
 
     #${PANEL_ID} .shc-label-wrap {
-      display: inline-grid;
+      display: grid;
       grid-template-columns: 14px minmax(0, auto);
       align-items: center;
       column-gap: 7px;
       min-width: 0;
-      line-height: 18px;
+      height: 20px;
+      line-height: 20px;
     }
 
     #${PANEL_ID} .shc-label-wrap span:last-child {
       min-width: 0;
+      height: 20px;
+      line-height: 20px;
       overflow: hidden;
       text-overflow: ellipsis;
+      display: block;
     }
 
     #${PANEL_ID} .shc-row-icon {
       width: 14px;
-      height: 14px;
+      height: 20px;
       min-width: 14px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       opacity: 0.95;
+      line-height: 20px;
     }
 
     #${PANEL_ID} .shc-row-icon svg {
@@ -330,8 +360,18 @@ function ensureStyle(doc: Document) {
       stroke: currentColor;
     }
 
+    #${PANEL_ID} .shc-native-icon {
+      width: 14px;
+      min-width: 14px;
+      height: 20px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 20px;
+      color: currentColor;
+    }
+
     #${PANEL_ID} .shc-row-icon-normal {
-      color: var(--shc-text);
+      color: var(--shc-muted);
     }
 
     #${PANEL_ID} .shc-row-icon-muted {
@@ -355,13 +395,16 @@ function ensureStyle(doc: Document) {
     }
 
     #${PANEL_ID} .shc-value {
-      color: #ffffff;
+      color: var(--shc-text);
       font-weight: 700;
       text-align: right;
       white-space: nowrap;
-      line-height: 18px;
-      min-height: 18px;
-      display: block;
+      height: 20px;
+      line-height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      transform: translateY(1px);
     }
 
     #${PANEL_ID} .shc-value-yellow {
@@ -388,20 +431,24 @@ function ensureStyle(doc: Document) {
       display: flex;
       justify-content: flex-end;
       align-items: center;
-      margin-top: 6px;
-      padding-top: 7px;
+      margin-top: 4px;
+      padding-top: 5px;
+      min-height: 19px;
       border-top: 1px solid var(--shc-row-border);
     }
 
-    #${PANEL_ID} .shc-link {
+    #${PANEL_ID} .shc-link,
+    #${PANEL_ID} .shc-link:visited {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      color: var(--shc-accent);
+      color: var(--shc-link-accent);
       font-size: 12px;
       font-weight: 600;
+      line-height: 14px;
+      height: 14px;
       text-decoration: none;
-      opacity: 0.95;
+      opacity: 1;
     }
 
     #${PANEL_ID} .shc-link:hover {
@@ -425,7 +472,7 @@ function ensureStyle(doc: Document) {
       align-items: center;
       justify-content: center;
       border-radius: 3px;
-      background: var(--shc-accent);
+      background: var(--shc-link-accent);
       color: #0b141d;
       font-size: 7px;
       font-weight: 800;
@@ -439,14 +486,52 @@ function ensureStyle(doc: Document) {
 
     @media (max-width: 900px) {
       #${PANEL_ID} {
-        right: 12px;
-        bottom: 92px;
         width: 310px;
       }
     }
   `;
 
   doc.head?.appendChild(style);
+}
+
+function parseRgb(value: string): Rgba | null {
+  const match = value
+    .trim()
+    .match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    r: Math.max(0, Math.min(255, Number(match[1]))),
+    g: Math.max(0, Math.min(255, Number(match[2]))),
+    b: Math.max(0, Math.min(255, Number(match[3]))),
+    a: match[4] === undefined ? 1 : Math.max(0, Math.min(1, Number(match[4]))),
+  };
+}
+
+function rgbaString(color: Rgba, alpha?: number): string {
+  const a = alpha === undefined ? color.a : alpha;
+
+  return `rgba(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)}, ${Math.max(
+    0,
+    Math.min(1, a)
+  )})`;
+}
+
+function mixRgb(a: Rgba, b: Rgba, amount: number, alpha = 1): string {
+  const t = Math.max(0, Math.min(1, amount));
+
+  return rgbaString(
+    {
+      r: a.r + (b.r - a.r) * t,
+      g: a.g + (b.g - a.g) * t,
+      b: a.b + (b.b - a.b) * t,
+      a: alpha,
+    },
+    alpha
+  );
 }
 
 function colorLooksUseful(value: string): boolean {
@@ -460,72 +545,438 @@ function colorLooksUseful(value: string): boolean {
     return false;
   }
 
+  const rgb = parseRgb(color);
+
+  if (rgb && rgb.a <= 0.03) {
+    return false;
+  }
+
   return color.startsWith('rgb') || color.startsWith('#');
 }
 
-function findLibraryThemeColor(doc: Document): string | null {
-  const selectors = [
-    '[class*="Collection"]',
-    '[class*="collection"]',
-    '[class*="Tag"]',
-    '[class*="tag"]',
-    '[class*="Pill"]',
-    '[class*="pill"]',
-    '[class*="AppTag"]',
-    '[class*="app_tag"]',
-  ];
+function isTooGenericDark(value: string): boolean {
+  const rgb = parseRgb(value);
 
-  const candidates = Array.from(doc.querySelectorAll<HTMLElement>(selectors.join(',')));
+  if (!rgb) {
+    return false;
+  }
 
-  for (const candidate of candidates) {
-    const rect = candidate.getBoundingClientRect();
+  return rgb.r < 18 && rgb.g < 22 && rgb.b < 28;
+}
 
-    if (rect.width < 20 || rect.height < 8) {
-      continue;
-    }
+function getUsefulStyleColor(style: CSSStyleDeclaration | null, properties: string[]): string | null {
+  if (!style) {
+    return null;
+  }
 
-    const style = doc.defaultView?.getComputedStyle(candidate);
+  for (const property of properties) {
+    const value = style.getPropertyValue(property).trim();
 
-    if (!style) {
-      continue;
-    }
-
-    const background = style.backgroundColor;
-    const border = style.borderTopColor;
-    const color = style.color;
-
-    if (colorLooksUseful(background) && !background.includes('13, 17, 22')) {
-      return background;
-    }
-
-    if (colorLooksUseful(border)) {
-      return border;
-    }
-
-    if (colorLooksUseful(color)) {
-      return color;
+    if (colorLooksUseful(value)) {
+      return value;
     }
   }
 
   return null;
 }
 
-function applyLibraryTheme(doc: Document, panel: HTMLElement) {
-  const rootStyle = doc.defaultView?.getComputedStyle(doc.documentElement);
-  const tagColor = findLibraryThemeColor(doc);
+function getNativePanelBackgroundFromColor(source: Rgba): string {
+  const black: Rgba = { r: 0, g: 0, b: 0, a: 1 };
+  const neutral: Rgba = { r: 52, g: 60, b: 64, a: 1 };
 
-  const accent =
-    tagColor ||
+  const luminance = (0.2126 * source.r + 0.7152 * source.g + 0.0722 * source.b) / 255;
+
+  if (luminance > 0.48) {
+    return mixRgb(source, black, 0.58, 0.82);
+  }
+
+  return mixRgb(source, neutral, 0.38, 0.82);
+}
+
+function findTopRightCollectionPillTheme(doc: Document): LibraryPillTheme | null {
+  const view = doc.defaultView;
+
+  if (!view) {
+    return null;
+  }
+
+  const viewportWidth = view.innerWidth || doc.documentElement.clientWidth || 0;
+  const viewportHeight = view.innerHeight || doc.documentElement.clientHeight || 0;
+
+  function isCollectionPillText(text: string): boolean {
+    const clean = text.trim();
+
+    if (!clean || clean.length < 2 || clean.length > 40) {
+      return false;
+    }
+
+    const lower = clean.toLowerCase();
+
+    if (
+      lower.includes('median completion') ||
+      lower.includes('players perfected') ||
+      lower.includes('perfected by starters') ||
+      lower.includes('view on steamhunters') ||
+      lower.includes('errungenschaften') ||
+      lower.includes('achievements') ||
+      lower.includes('spielen') ||
+      lower.includes('play')
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function getReadableBackgroundFromElement(element: HTMLElement): {
+    background: string;
+    text: string | null;
+    shadow: string | null;
+  } | null {
+    let current: HTMLElement | null = element;
+
+    for (let depth = 0; current && depth < 6; depth += 1) {
+      const style = view.getComputedStyle(current);
+      const background = style.backgroundColor;
+      const rgb = parseRgb(background);
+
+      if (rgb && rgb.a > 0.08 && !isTooGenericDark(background)) {
+        const text = getUsefulStyleColor(style, ['color']);
+        const shadow = style.boxShadow && style.boxShadow !== 'none' ? style.boxShadow : null;
+
+        return {
+          background,
+          text,
+          shadow,
+        };
+      }
+
+      current = current.parentElement;
+    }
+
+    return null;
+  }
+
+  const candidates = Array.from(
+    doc.querySelectorAll<HTMLElement>(
+      [
+        '[class*="Collection"]',
+        '[class*="collection"]',
+        '[class*="Tag"]',
+        '[class*="tag"]',
+        '[class*="Pill"]',
+        '[class*="pill"]',
+        '[class*="Capsule"]',
+        '[class*="capsule"]',
+        '[class*="AppTag"]',
+        '[class*="app_tag"]',
+        'button',
+        'div',
+        'span',
+      ].join(',')
+    )
+  );
+
+  let best: {
+    score: number;
+    background: string;
+    text: string | null;
+    shadow: string | null;
+  } | null = null;
+
+  for (const candidate of candidates) {
+    if (candidate.id === PANEL_ID || candidate.closest(`#${PANEL_ID}`)) {
+      continue;
+    }
+
+    const rect = candidate.getBoundingClientRect();
+
+    if (rect.width < 38 || rect.width > 210 || rect.height < 18 || rect.height > 46) {
+      continue;
+    }
+
+    if (rect.top < 0 || rect.top > Math.max(110, viewportHeight * 0.18)) {
+      continue;
+    }
+
+    if (rect.left < viewportWidth * 0.28) {
+      continue;
+    }
+
+    const text = String(candidate.textContent || '').trim();
+
+    if (!isCollectionPillText(text)) {
+      continue;
+    }
+
+    const colors = getReadableBackgroundFromElement(candidate);
+
+    if (!colors) {
+      continue;
+    }
+
+    const bgRgb = parseRgb(colors.background);
+
+    if (!bgRgb || bgRgb.a <= 0.08) {
+      continue;
+    }
+
+    const style = view.getComputedStyle(candidate);
+
+    let score = 0;
+
+    score += 120 - Math.min(120, rect.top);
+    score += Math.max(0, rect.left - viewportWidth * 0.28) / 8;
+
+    if (/^[A-Z0-9 ÄÖÜ&:_-]+$/.test(text)) {
+      score += 30;
+    }
+
+    if (text.length >= 3 && text.length <= 18) {
+      score += 14;
+    }
+
+    if (style.borderRadius && style.borderRadius !== '0px') {
+      score += 10;
+    }
+
+    if (colors.shadow) {
+      score += 10;
+    }
+
+    if (!best || score > best.score) {
+      best = {
+        score,
+        background: colors.background,
+        text: colors.text,
+        shadow: colors.shadow,
+      };
+    }
+  }
+
+  if (!best) {
+    return null;
+  }
+
+  const bgRgb = parseRgb(best.background);
+
+  if (!bgRgb) {
+    return null;
+  }
+
+  const white: Rgba = { r: 255, g: 255, b: 255, a: 1 };
+
+  const panelBackground = getNativePanelBackgroundFromColor(bgRgb);
+  const rowBorder = mixRgb(bgRgb, white, 0.48, 0.16);
+  const text = '#ffffff';
+  const muted = 'rgba(255, 255, 255, 0.78)';
+  const accent = mixRgb(bgRgb, white, 0.48, 1);
+
+  return {
+    background: panelBackground,
+    rowBorder,
+    text,
+    muted,
+    accent,
+    shadow: best.shadow || '0 12px 28px rgba(0, 0, 0, 0.38)',
+  };
+}
+
+function findLibraryActionBar(container: HTMLElement): HTMLElement | null {
+  const candidates = Array.from(
+    container.querySelectorAll<HTMLElement>(
+      [
+        '[class*="PlayBar"]',
+        '[class*="playbar"]',
+        '[class*="AppActionButton"]',
+        '[class*="appaction"]',
+        '[class*="GamepadUIAppDetails_PlayBar"]',
+        '[class*="Achievements"]',
+        '[class*="achievements"]',
+      ].join(',')
+    )
+  );
+
+  for (const candidate of candidates) {
+    const text = String(candidate.textContent || '').toLowerCase();
+    const rect = candidate.getBoundingClientRect();
+
+    if (rect.width < 250 || rect.height < 40) {
+      continue;
+    }
+
+    if (
+      text.includes('spielen') ||
+      text.includes('play') ||
+      text.includes('install') ||
+      text.includes('achievements') ||
+      text.includes('errungenschaften')
+    ) {
+      return candidate;
+    }
+  }
+
+  const containerRect = container.getBoundingClientRect();
+  const broadCandidates = Array.from(container.children) as HTMLElement[];
+
+  for (const candidate of broadCandidates) {
+    const rect = candidate.getBoundingClientRect();
+
+    const nearBottom =
+      rect.bottom > containerRect.bottom - 125 &&
+      rect.top < containerRect.bottom - 20;
+
+    if (
+      nearBottom &&
+      rect.width > containerRect.width * 0.5 &&
+      rect.height >= 45 &&
+      rect.height < 120
+    ) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function findActionBarThemeColors(
+  doc: Document,
+  container: HTMLElement
+): {
+  background: string | null;
+  rowBorder: string | null;
+  shadow: string | null;
+  text: string | null;
+} {
+  const actionBar = findLibraryActionBar(container);
+
+  if (!actionBar) {
+    return {
+      background: null,
+      rowBorder: null,
+      shadow: null,
+      text: null,
+    };
+  }
+
+  const view = doc.defaultView;
+  const actionStyle = view?.getComputedStyle(actionBar) || null;
+
+  let background = getUsefulStyleColor(actionStyle, [
+    'background-color',
+    '--gradient-body-background-color',
+    '--color-background',
+  ]);
+
+  let text = getUsefulStyleColor(actionStyle, ['color']);
+
+  if (!background || isTooGenericDark(background)) {
+    const children = Array.from(actionBar.querySelectorAll<HTMLElement>('*')).slice(0, 60);
+
+    for (const child of children) {
+      const rect = child.getBoundingClientRect();
+
+      if (rect.width < 80 || rect.height < 20) {
+        continue;
+      }
+
+      const childStyle = view?.getComputedStyle(child) || null;
+      const childBackground = getUsefulStyleColor(childStyle, ['background-color']);
+      const childText = getUsefulStyleColor(childStyle, ['color']);
+
+      if (!background && childBackground && !isTooGenericDark(childBackground)) {
+        background = childBackground;
+      }
+
+      if (!text && childText) {
+        text = childText;
+      }
+
+      if (background && text) {
+        break;
+      }
+    }
+  }
+
+  const bgRgb = background ? parseRgb(background) : null;
+
+  const panelBackground = bgRgb
+    ? rgbaString(bgRgb, Math.max(0.68, Math.min(0.84, bgRgb.a || 0.78)))
+    : null;
+
+  const rowBorder = bgRgb ? rgbaString({ ...bgRgb, a: 1 }, 0.16) : null;
+
+  const shadow =
+    actionStyle?.boxShadow && actionStyle.boxShadow !== 'none'
+      ? actionStyle.boxShadow
+      : '0 12px 28px rgba(0, 0, 0, 0.38)';
+
+  return {
+    background: panelBackground,
+    rowBorder,
+    shadow,
+    text: text || null,
+  };
+}
+
+function applyLibraryTheme(doc: Document, container: HTMLElement, panel: HTMLElement) {
+  const rootStyle = doc.defaultView?.getComputedStyle(doc.documentElement);
+  const pillTheme = findTopRightCollectionPillTheme(doc);
+  const actionTheme = findActionBarThemeColors(doc, container);
+
+  const fallbackAccent =
     rootStyle?.getPropertyValue('--SystemAccentColor').trim() ||
     rootStyle?.getPropertyValue('--gpColor-Blue').trim() ||
     '#66c0f4';
 
-  panel.style.setProperty('--shc-accent', accent);
-  panel.style.setProperty('--shc-text', '#dfe3e6');
-  panel.style.setProperty('--shc-muted', '#9fb0bf');
-  panel.style.setProperty('--shc-panel-bg', 'rgba(13, 17, 22, 0.94)');
-  panel.style.setProperty('--shc-border', 'rgba(117, 174, 209, 0.35)');
-  panel.style.setProperty('--shc-row-border', 'rgba(255, 255, 255, 0.08)');
+  const nativeFallbackBackground = 'rgba(36, 43, 47, 0.82)';
+  const nativeFallbackRowBorder = 'rgba(255, 255, 255, 0.105)';
+  const labelText = 'rgba(255, 255, 255, 0.78)';
+  const fixedSteamHuntersLinkColor = '#66c0f4';
+
+  panel.style.setProperty('--shc-link-accent', fixedSteamHuntersLinkColor);
+
+  if (pillTheme) {
+    panel.style.setProperty('--shc-accent', pillTheme.accent);
+    panel.style.setProperty('--shc-text', pillTheme.text);
+    panel.style.setProperty('--shc-muted', pillTheme.muted || labelText);
+    panel.style.setProperty('--shc-panel-bg', actionTheme.background || pillTheme.background);
+    panel.style.setProperty('--shc-row-border', actionTheme.rowBorder || pillTheme.rowBorder);
+    panel.style.setProperty('--shc-shadow', pillTheme.shadow);
+    return;
+  }
+
+  panel.style.setProperty('--shc-accent', fallbackAccent);
+  panel.style.setProperty('--shc-text', '#ffffff');
+  panel.style.setProperty('--shc-muted', labelText);
+  panel.style.setProperty('--shc-panel-bg', actionTheme.background || nativeFallbackBackground);
+  panel.style.setProperty('--shc-row-border', actionTheme.rowBorder || nativeFallbackRowBorder);
+  panel.style.setProperty('--shc-shadow', actionTheme.shadow || '0 12px 28px rgba(0, 0, 0, 0.38)');
+}
+
+function applyAdaptiveLibraryPanelPosition(container: HTMLElement, panel: HTMLElement) {
+  const containerRect = container.getBoundingClientRect();
+  const actionBar = findLibraryActionBar(container);
+
+  let bottom = 96;
+
+  if (actionBar) {
+    const barRect = actionBar.getBoundingClientRect();
+    const distanceFromContainerBottomToBarTop = containerRect.bottom - barRect.top;
+
+    if (
+      Number.isFinite(distanceFromContainerBottomToBarTop) &&
+      distanceFromContainerBottomToBarTop > 40 &&
+      distanceFromContainerBottomToBarTop < containerRect.height
+    ) {
+      bottom = Math.ceil(distanceFromContainerBottomToBarTop + 10);
+    }
+  }
+
+  panel.style.right = '16px';
+  panel.style.left = 'auto';
+  panel.style.top = 'auto';
+  panel.style.bottom = `${bottom}px`;
 }
 
 function getOrCreatePanel(doc: Document, container: HTMLElement): HTMLElement {
@@ -538,7 +989,9 @@ function getOrCreatePanel(doc: Document, container: HTMLElement): HTMLElement {
       container.appendChild(existing);
     }
 
-    applyLibraryTheme(doc, existing);
+    container.style.position = 'relative';
+    applyAdaptiveLibraryPanelPosition(container, existing);
+    applyLibraryTheme(doc, container, existing);
     return existing;
   }
 
@@ -549,7 +1002,8 @@ function getOrCreatePanel(doc: Document, container: HTMLElement): HTMLElement {
   container.style.position = 'relative';
   container.appendChild(panel);
 
-  applyLibraryTheme(doc, panel);
+  applyAdaptiveLibraryPanelPosition(container, panel);
+  applyLibraryTheme(doc, container, panel);
   return panel;
 }
 
@@ -612,16 +1066,6 @@ function iconSvg(kind: string): string {
     `;
   }
 
-  if (kind === 'restricted') {
-    return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 3a9 9 0 1 0 9 9" fill="none" stroke-width="2" stroke-linecap="round"/>
-        <path d="M20.2 6.8a9 9 0 0 0-3-2.4" fill="none" stroke-width="2" stroke-linecap="round"/>
-        <path d="M12 1.8v3.6M12 18.6v3.6M1.8 12h3.6M18.6 12h3.6M4.8 4.8l2.5 2.5M16.7 16.7l2.5 2.5M19.2 4.8l-2.5 2.5M7.3 16.7l-2.5 2.5" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-    `;
-  }
-
   if (kind === 'star') {
     return `
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -635,15 +1079,6 @@ function iconSvg(kind: string): string {
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="9" fill="none" stroke-width="2"/>
         <path d="M12 7v5l3.2 2" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    `;
-  }
-
-  if (kind === 'chart') {
-    return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 19h16" fill="none" stroke-width="2" stroke-linecap="round"/>
-        <path d="M6 17V9h3v8H6Zm5 0V5h3v12h-3Zm5 0v-6h3v6h-3Z" stroke="none"/>
       </svg>
     `;
   }
@@ -703,11 +1138,15 @@ function normalizeKind(item: ShcResponseItem): string {
     return 'perfected_by_starters';
   }
 
+  if (kind === 'error' || label.includes('error')) {
+    return 'error';
+  }
+
   return 'info';
 }
 
 function getRowVisual(item: ShcResponseItem): {
-  iconKind: string;
+  iconHtml: string;
   iconClass: string;
   valueClass: string;
 } {
@@ -715,7 +1154,7 @@ function getRowVisual(item: ShcResponseItem): {
 
   if (kind === 'paid_dlc') {
     return {
-      iconKind: 'dlc',
+      iconHtml: iconSvg('dlc'),
       iconClass: 'shc-row-icon-yellow',
       valueClass: 'shc-value-yellow',
     };
@@ -723,7 +1162,7 @@ function getRowVisual(item: ShcResponseItem): {
 
   if (kind === 'broken') {
     return {
-      iconKind: 'broken',
+      iconHtml: iconSvg('broken'),
       iconClass: 'shc-row-icon-yellow',
       valueClass: 'shc-value-yellow',
     };
@@ -731,7 +1170,7 @@ function getRowVisual(item: ShcResponseItem): {
 
   if (kind === 'conditional') {
     return {
-      iconKind: 'conditional',
+      iconHtml: iconSvg('conditional'),
       iconClass: 'shc-row-icon-orange',
       valueClass: 'shc-value-orange',
     };
@@ -739,7 +1178,7 @@ function getRowVisual(item: ShcResponseItem): {
 
   if (kind === 'unobtainable') {
     return {
-      iconKind: 'unobtainable',
+      iconHtml: iconSvg('unobtainable'),
       iconClass: 'shc-row-icon-red',
       valueClass: 'shc-value-red',
     };
@@ -747,7 +1186,7 @@ function getRowVisual(item: ShcResponseItem): {
 
   if (kind === 'restricted') {
     return {
-      iconKind: 'restricted',
+      iconHtml: '<i class="icon icon-fw icon-spinner shc-native-icon" aria-hidden="true"></i>',
       iconClass: 'shc-row-icon-yellow',
       valueClass: 'shc-value-yellow',
     };
@@ -755,7 +1194,7 @@ function getRowVisual(item: ShcResponseItem): {
 
   if (kind === 'players_perfected') {
     return {
-      iconKind: 'star',
+      iconHtml: iconSvg('star'),
       iconClass: 'shc-row-icon-normal',
       valueClass: '',
     };
@@ -763,7 +1202,7 @@ function getRowVisual(item: ShcResponseItem): {
 
   if (kind === 'median_completion') {
     return {
-      iconKind: 'clock',
+      iconHtml: iconSvg('clock'),
       iconClass: 'shc-row-icon-normal',
       valueClass: '',
     };
@@ -771,17 +1210,37 @@ function getRowVisual(item: ShcResponseItem): {
 
   if (kind === 'perfected_by_starters') {
     return {
-      iconKind: 'percent',
+      iconHtml: iconSvg('percent'),
       iconClass: 'shc-row-icon-normal',
       valueClass: '',
     };
   }
 
   return {
-    iconKind: 'info',
+    iconHtml: iconSvg('info'),
     iconClass: 'shc-row-icon-muted',
     valueClass: '',
   };
+}
+
+function responseHasAchievementRows(response: ShcResponse): boolean {
+  if (!Array.isArray(response.items)) {
+    return false;
+  }
+
+  return response.items.some((item) => {
+    const kind = normalizeKind(item);
+
+    return (
+      kind === 'median_completion' ||
+      kind === 'players_perfected' ||
+      kind === 'perfected_by_starters' ||
+      kind === 'broken' ||
+      kind === 'conditional' ||
+      kind === 'unobtainable' ||
+      kind === 'restricted'
+    );
+  });
 }
 
 function renderResponse(
@@ -791,7 +1250,7 @@ function renderResponse(
   _reason: string,
   response: ShcResponse
 ) {
-  if (response.show_panel === false) {
+  if (response.show_panel === false || !responseHasAchievementRows(response)) {
     removePanel(doc);
     return;
   }
@@ -800,6 +1259,12 @@ function renderResponse(
 
   if (Array.isArray(response.items)) {
     for (const item of response.items) {
+      const kind = normalizeKind(item);
+
+      if (kind === 'info') {
+        continue;
+      }
+
       const visual = getRowVisual(item);
 
       rows.push(`
@@ -807,7 +1272,7 @@ function renderResponse(
           <div class="shc-label">
             <span class="shc-label-wrap">
               <span class="shc-row-icon ${visual.iconClass}">
-                ${iconSvg(visual.iconKind)}
+                ${visual.iconHtml}
               </span>
               <span>${safeText(item.label)}</span>
             </span>
@@ -849,6 +1314,9 @@ function renderResponse(
     ${rows.join('')}
     ${footer}
   `;
+
+  applyAdaptiveLibraryPanelPosition(container, panel);
+  applyLibraryTheme(doc, container, panel);
 }
 
 function renderError(
@@ -907,6 +1375,9 @@ async function updateLibraryPanel(doc: Document, reasonFromCaller: string) {
     !needsReattach &&
     existing
   ) {
+    container.style.position = 'relative';
+    applyAdaptiveLibraryPanelPosition(container, existing);
+    applyLibraryTheme(doc, container, existing);
     return;
   }
 
@@ -974,7 +1445,17 @@ function disconnectObserver() {
     observer = null;
   }
 
+  if (refreshTimer !== null) {
+    window.clearTimeout(refreshTimer);
+  }
+
+  if (libraryIntervalId !== null) {
+    window.clearInterval(libraryIntervalId);
+  }
+
+  observer = null;
   refreshTimer = null;
+  libraryIntervalId = null;
   lastAppId = null;
   processingAppId = null;
 }
@@ -997,6 +1478,8 @@ function setupLibraryObserver(doc: Document) {
   observer.observe(doc.body, {
     childList: true,
     subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style'],
   });
 
   doc.addEventListener(
@@ -1013,7 +1496,7 @@ function setupLibraryObserver(doc: Document) {
 
   scheduleLibraryUpdate(doc, 'initial');
 
-  window.setInterval(() => {
+  libraryIntervalId = window.setInterval(() => {
     if (currentDocument === doc) {
       scheduleLibraryUpdate(doc, 'interval');
     }

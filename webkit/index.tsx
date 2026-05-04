@@ -101,10 +101,13 @@ function ensureStyle() {
       clear: both;
 
       --scc-accent: var(--gpColor-Blue, #66c0f4);
+      --scc-link-accent: #66c0f4;
       --scc-text: var(--gpStoreLightGrey, #c7d5e0);
-      --scc-muted: var(--gpStoreLighterGrey, #8f98a0);
-      --scc-card-bg: rgba(28, 28, 28, 0.92);
-      --scc-border: rgba(255, 255, 255, 0.08);
+      --scc-muted: rgba(199, 213, 224, 0.78);
+
+      --scc-card-bg: rgba(27, 27, 27, 0.92);
+      --scc-border: rgba(255, 255, 255, 0.085);
+
       --scc-yellow: #ffcc66;
       --scc-orange: #f39c12;
       --scc-red: #ff6b6b;
@@ -120,8 +123,10 @@ function ensureStyle() {
       padding: 6px 12px 5px 12px;
       border-radius: 8px;
       background: var(--scc-card-bg);
-      border: 1px solid rgba(255, 255, 255, 0.04);
+      border: 0;
+      outline: 0;
       box-shadow: none;
+      overflow: hidden;
     }
 
     #${PANEL_ID} .scc-row {
@@ -131,6 +136,7 @@ function ensureStyle() {
       column-gap: 12px;
       padding: 1px 0;
       min-height: 20px;
+      line-height: 20px;
       border-top: 1px solid var(--scc-border);
     }
 
@@ -146,32 +152,42 @@ function ensureStyle() {
     #${PANEL_ID} .scc-label {
       color: var(--scc-muted);
       min-width: 0;
+      height: 20px;
+      line-height: 20px;
       overflow: hidden;
+      display: flex;
+      align-items: center;
+      font-weight: 500;
     }
 
     #${PANEL_ID} .scc-label-wrap {
-      display: inline-grid;
+      display: grid;
       grid-template-columns: 14px minmax(0, auto);
       align-items: center;
       column-gap: 6px;
       min-width: 0;
-      line-height: 18px;
+      height: 20px;
+      line-height: 20px;
     }
 
     #${PANEL_ID} .scc-label-wrap span:last-child {
       min-width: 0;
+      height: 20px;
+      line-height: 20px;
       overflow: hidden;
       text-overflow: ellipsis;
+      display: block;
     }
 
     #${PANEL_ID} .scc-row-icon {
       width: 14px;
-      height: 14px;
+      height: 20px;
       min-width: 14px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       opacity: 0.95;
+      line-height: 20px;
     }
 
     #${PANEL_ID} .scc-row-icon svg {
@@ -185,14 +201,15 @@ function ensureStyle() {
     #${PANEL_ID} .scc-native-icon {
       width: 14px;
       min-width: 14px;
+      height: 20px;
       text-align: center;
       font-size: 12px;
-      line-height: 14px;
+      line-height: 20px;
       color: currentColor;
     }
 
     #${PANEL_ID} .scc-row-icon-normal {
-      color: var(--scc-text);
+      color: var(--scc-muted);
     }
 
     #${PANEL_ID} .scc-row-icon-muted {
@@ -216,9 +233,12 @@ function ensureStyle() {
       font-weight: 700;
       text-align: right;
       white-space: nowrap;
-      line-height: 18px;
-      min-height: 18px;
-      display: block;
+      height: 20px;
+      line-height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      transform: translateY(1px);
     }
 
     #${PANEL_ID} .scc-value-yellow {
@@ -242,20 +262,24 @@ function ensureStyle() {
       display: flex;
       justify-content: flex-end;
       align-items: center;
-      margin-top: 6px;
+      margin-top: 5px;
       padding-top: 6px;
+      min-height: 20px;
       border-top: 1px solid var(--scc-border);
     }
 
-    #${PANEL_ID} .scc-link {
+    #${PANEL_ID} .scc-link,
+    #${PANEL_ID} .scc-link:visited {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      color: var(--scc-accent);
+      color: var(--scc-link-accent);
       font-size: 12px;
       font-weight: 600;
+      line-height: 14px;
+      height: 14px;
       text-decoration: none;
-      opacity: 0.92;
+      opacity: 0.95;
     }
 
     #${PANEL_ID} .scc-link:hover {
@@ -279,7 +303,7 @@ function ensureStyle() {
       align-items: center;
       justify-content: center;
       border-radius: 3px;
-      background: var(--scc-accent);
+      background: var(--scc-link-accent);
       color: #0b141d;
       font-size: 7px;
       font-weight: 800;
