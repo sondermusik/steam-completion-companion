@@ -228,9 +228,9 @@ function ensureStyle(doc: Document) {
       padding: 7px 14px;
       border-radius: 9px;
       color: var(--scc-text, #ffffff);
-      background: var(--scc-panel-bg, rgba(36, 43, 47, 0.82));
+      background: var(--scc-panel-bg, rgba(14, 20, 27, 0.85));
       border: 0;
-      box-shadow: var(--scc-shadow, 0 12px 28px rgba(0, 0, 0, 0.38));
+      box-shadow: var(--scc-shadow, none);
       font-family: Arial, Helvetica, sans-serif;
       font-size: 13px;
       line-height: 1;
@@ -243,7 +243,7 @@ function ensureStyle(doc: Document) {
       --scc-muted: rgba(255, 255, 255, 0.78);
       --scc-panel-bg: rgba(36, 43, 47, 0.82);
       --scc-row-border: rgba(255, 255, 255, 0.105);
-      --scc-shadow: 0 12px 28px rgba(0, 0, 0, 0.38);
+      --scc-shadow: none;
       --scc-yellow: #ffcc66;
       --scc-orange: #f39c12;
       --scc-red: #ff6b6b;
@@ -806,7 +806,7 @@ function applyLibraryTheme(doc: Document, container: HTMLElement, panel: HTMLEle
   panel.style.setProperty('--scc-muted', pillTheme?.muted || labelText);
   panel.style.setProperty('--scc-panel-bg', actionTheme.background || pillTheme?.background || nativeFallbackBackground);
   panel.style.setProperty('--scc-row-border', actionTheme.rowBorder || pillTheme?.rowBorder || nativeFallbackRowBorder);
-  panel.style.setProperty('--scc-shadow', actionTheme.shadow || pillTheme?.shadow || '0 12px 28px rgba(0, 0, 0, 0.38)');
+  panel.style.setProperty('--scc-shadow', 'none');
 }
 
 function applyLibraryPanelPosition(panel: HTMLElement) {
