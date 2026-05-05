@@ -2,6 +2,40 @@
 export type IpcValue = string | number | boolean | null;
 export type IpcParams = Record<string, IpcValue>;
 
+export type SteamCompletionCompanionVisibleContentSettings = {
+  medianCompletion: boolean;
+  playersPerfected: boolean;
+  perfectedByStarters: boolean;
+  paidDlc: boolean;
+  restricted: boolean;
+  broken: boolean;
+  conditional: boolean;
+  unobtainable: boolean;
+  steamHuntersLink: boolean;
+};
+
+export type SteamCompletionCompanionSettings = {
+  showInLibrary: boolean;
+  showOnStorePages: boolean;
+  visibleContent: SteamCompletionCompanionVisibleContentSettings;
+};
+
+export const DEFAULT_SETTINGS: SteamCompletionCompanionSettings = {
+  showInLibrary: true,
+  showOnStorePages: true,
+  visibleContent: {
+    medianCompletion: true,
+    playersPerfected: true,
+    perfectedByStarters: true,
+    paidDlc: true,
+    restricted: true,
+    broken: true,
+    conditional: true,
+    unobtainable: true,
+    steamHuntersLink: true,
+  },
+};
+
 export type CompletionCompanionResponseItem = {
   label?: string;
   value?: string;
@@ -226,23 +260,8 @@ export function responseHasCompletionRows(response: CompletionCompanionResponse)
   });
 }
 
-export function getSteamHuntersIconFontCss(scopeSelector: string): string {
-  return `
-    ${scopeSelector} .scc-row-icon-restricted {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    ${scopeSelector} .scc-row-icon-restricted .icon-spinner::before {
-      content: "\\e90c" !important;
-      font-family: "scc-steamhunters-icomoon" !important;
-      font-size: 12px !important;
-      line-height: 1 !important;
-      display: inline-block !important;
-      transform: translateY(0.5px);
-    }
-  `;
+export function getSteamHuntersIconFontCss(_scopeSelector: string): string {
+  return '';
 }
 
 export function getCompletionCompanionIconSvg(kind: string): string {

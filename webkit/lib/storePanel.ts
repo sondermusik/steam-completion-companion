@@ -1,6 +1,9 @@
-// @ts-nocheck
 // webkit/lib/storePanel.ts
+
+// @ts-nocheck
+
 import { callable } from '@steambrew/webkit';
+import { getSettings, initSettings } from './settings';
 import {
   escapeHtml,
   getCompletionCompanionIconHtml,
@@ -27,6 +30,21 @@ function log(...args) {
 
 function warn(...args) {
   console.warn(NS, ...args);
+}
+
+function shouldShowRowKind(kind) {
+  const visible = getSettings().visibleContent;
+
+  if (kind === 'median_completion') return visible.medianCompletion;
+  if (kind === 'players_perfected') return visible.playersPerfected;
+  if (kind === 'perfected_by_starters') return visible.perfectedByStarters;
+  if (kind === 'paid_dlc') return visible.paidDlc;
+  if (kind === 'restricted') return visible.restricted;
+  if (kind === 'broken') return visible.broken;
+  if (kind === 'conditional') return visible.conditional;
+  if (kind === 'unobtainable') return visible.unobtainable;
+
+  return true;
 }
 
 function getStoreAppIdFromUrl() {
@@ -396,6 +414,10 @@ function renderResponse(response) {
         continue;
       }
 
+      if (!shouldShowRowKind(rowKind)) {
+  continue;
+}
+
       const label = escapeHtml(item.label);
       const value = escapeHtml(item.value);
       const icon = getCompletionCompanionIconHtml(rowKind);
@@ -433,8 +455,8 @@ function renderResponse(response) {
     ? escapeHtml(response.steam_hunters_url)
     : '';
 
-  const footer = steamHuntersUrl
-    ? `
+const footer = steamHuntersUrl && getSettings().visibleContent.steamHuntersLink
+  ? `
       <div class="scc-footer">
         <a class="scc-link" href="${steamHuntersUrl}" target="_blank" rel="noopener noreferrer">
           <img
@@ -472,6 +494,14 @@ function renderError(message) {
 }
 
 async function updateStorePanel(reason) {
+  await initSettings();
+
+  if (!getSettings().showOnStorePages) {
+    lastAppId = null;
+    removePanel();
+    return;
+  }
+
   const appId = getStoreAppIdFromUrl();
 
   if (appId === null) {

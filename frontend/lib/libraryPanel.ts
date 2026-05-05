@@ -1,4 +1,5 @@
 import { callable } from '@steambrew/client';
+import { getSettings, subscribeSettings } from './settings';
 import {
   CompletionCompanionResponse,
   IpcParams,
@@ -56,6 +57,8 @@ let refreshTimer: number | null = null;
 let lastAppId: number | null = null;
 let processingAppId: number | null = null;
 let libraryIntervalId: number | null = null;
+
+let unsubscribeSettings: (() => void) | null = null;
 
 function log(...args: unknown[]) {
   console.log(NS, ...args);
@@ -130,6 +133,21 @@ function getLibraryAppId(): {
     href,
     pathname,
   };
+}
+
+function shouldShowRowKind(kind: string): boolean {
+  const visible = getSettings().visibleContent;
+
+  if (kind === 'median_completion') return visible.medianCompletion;
+  if (kind === 'players_perfected') return visible.playersPerfected;
+  if (kind === 'perfected_by_starters') return visible.perfectedByStarters;
+  if (kind === 'paid_dlc') return visible.paidDlc;
+  if (kind === 'restricted') return visible.restricted;
+  if (kind === 'broken') return visible.broken;
+  if (kind === 'conditional') return visible.conditional;
+  if (kind === 'unobtainable') return visible.unobtainable;
+
+  return true;
 }
 
 function getGameName(appId: number): string {
@@ -867,6 +885,10 @@ function renderResponse(
         continue;
       }
 
+      if (!shouldShowRowKind(kind)) {
+  continue;
+}
+
       const icon = getCompletionCompanionIconHtml(kind);
       const valueClass = getCompletionCompanionValueClass(kind);
 
@@ -897,8 +919,8 @@ function renderResponse(
     ? escapeHtml(response.steam_hunters_url)
     : '';
 
-  const footer = steamHuntersUrl
-    ? `
+const footer = steamHuntersUrl && getSettings().visibleContent.steamHuntersLink
+  ? `
       <div class="scc-footer">
         <a class="scc-link" href="${steamHuntersUrl}" target="_blank" rel="noopener noreferrer">
           <img
@@ -948,6 +970,13 @@ function renderError(
 }
 
 async function updateLibraryPanel(doc: Document, reasonFromCaller: string) {
+  if (!getSettings().showInLibrary) {
+    lastAppId = null;
+    processingAppId = null;
+    removePanel(doc);
+    return;
+  }
+
   const detection = getLibraryAppId();
 
   if (detection.appId === null) {
@@ -1055,6 +1084,12 @@ export function disconnectLibraryObserver() {
     window.clearInterval(libraryIntervalId);
   }
 
+  if (unsubscribeSettings !== null) {
+    unsubscribeSettings();
+  }
+
+  unsubscribeSettings = null;
+
   observer = null;
   refreshTimer = null;
   libraryIntervalId = null;
@@ -1070,6 +1105,14 @@ export function setupLibraryObserver(doc: Document) {
   disconnectLibraryObserver();
 
   currentDocument = doc;
+
+unsubscribeSettings = subscribeSettings((settings: { showInLibrary: boolean }) => {    if (!settings.showInLibrary) {
+      removePanel(doc);
+      return;
+    }
+
+    scheduleLibraryUpdate(doc, 'settings_changed');
+  });
 
   log('setup library observer', {
     docTitle: doc.title,

@@ -2,6 +2,7 @@ local logger = require("logger")
 local millennium = require("millennium")
 local http = require("http")
 local json = require("json")
+local settings = require("settings")
 
 local NS = "[SCC]"
 
@@ -472,6 +473,31 @@ function shc_json_bridge(payload_json)
     )
 end
 
+function GetSettings()
+    return encode_json({
+        ok = true,
+        settings = settings.load()
+    })
+end
+
+function SaveSettings(settings_json)
+    local decoded, err = decode_json(settings_json)
+
+    if err ~= nil then
+        return encode_json({
+            ok = false,
+            error = err
+        })
+    end
+
+    local saved = settings.save(decoded)
+
+    return encode_json({
+        ok = saved,
+        settings = settings.load()
+    })
+end
+
 local function on_load()
     log("backend on_load")
     millennium.ready()
@@ -488,5 +514,8 @@ end
 return {
     on_load = on_load,
     on_frontend_loaded = on_frontend_loaded,
-    on_unload = on_unload
+    on_unload = on_unload,
+    GetSettings = GetSettings,
+    SaveSettings = SaveSettings,
+    shc_json_bridge = shc_json_bridge
 }
