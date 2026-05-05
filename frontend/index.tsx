@@ -24,6 +24,13 @@ import {
 
 const NS = '[SCC_FRONTEND]';
 
+const LIBRARY_POSITION_OPTIONS = [
+  { value: 'bottomRight', label: 'Bottom Right' },
+  { value: 'bottomLeft', label: 'Bottom Left' },
+  { value: 'topRight', label: 'Top Right' },
+  { value: 'topLeft', label: 'Top Left' },
+];
+
 function SettingsToggle({
   checked,
   onChange,
@@ -71,11 +78,31 @@ function SettingsHeader({
 function SettingsContent() {
   const [settings, setSettings] = useState<SteamCompletionCompanionSettings>(getSettings());
 
-  useEffect(() => {
-    initSettings();
+  const [libraryPanelPosition, setLibraryPanelPositionState] = useState<
+  SteamCompletionCompanionSettings['libraryPanelPosition']
+>(getSettings().libraryPanelPosition);
 
-    return subscribeSettings(setSettings);
-  }, []);
+const [libraryPanelHorizontalOffset, setLibraryPanelHorizontalOffsetState] = useState(
+  String(getSettings().libraryPanelHorizontalOffset)
+);
+
+const [libraryPanelVerticalOffset, setLibraryPanelVerticalOffsetState] = useState(
+  String(getSettings().libraryPanelVerticalOffset)
+);
+
+useEffect(() => {
+  initSettings().then((loadedSettings) => {
+    setSettings(loadedSettings);
+
+    setLibraryPanelPositionState(loadedSettings.libraryPanelPosition);
+    setLibraryPanelHorizontalOffsetState(String(loadedSettings.libraryPanelHorizontalOffset));
+    setLibraryPanelVerticalOffsetState(String(loadedSettings.libraryPanelVerticalOffset));
+  });
+
+  return subscribeSettings((nextSettings) => {
+    setSettings(nextSettings);
+  });
+}, []);
 
   async function setShowInLibrary(showInLibrary: boolean) {
     const nextSettings = {
@@ -107,26 +134,87 @@ function SettingsContent() {
     }
   }
 
-async function setVisibleContent(
-  key: keyof SteamCompletionCompanionSettings['visibleContent'],
-  value: boolean
-) {
-  const nextSettings = {
-    ...settings,
-    visibleContent: {
-      ...settings.visibleContent,
-      [key]: value,
-    },
-  };
+async function onLibraryPanelPositionChange(event: React.ChangeEvent<HTMLSelectElement>) {
+  const value = event.target.value as SteamCompletionCompanionSettings['libraryPanelPosition'];
 
-  setSettings(nextSettings);
+  console.log(NS, 'library position changed', value);
+
+  setLibraryPanelPositionState(value);
 
   try {
-    await saveSettings(nextSettings);
+    await saveSettings({
+      ...getSettings(),
+      libraryPanelPosition: value,
+    });
   } catch (error) {
     console.warn(NS, 'failed to save setting', error);
   }
 }
+
+async function onLibraryPanelHorizontalOffsetChange(event: React.ChangeEvent<HTMLInputElement>) {
+  const value = event.target.value;
+
+  console.log(NS, 'horizontal offset changed', value);
+
+  setLibraryPanelHorizontalOffsetState(value);
+
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isNaN(parsed)) {
+    try {
+      await saveSettings({
+        ...getSettings(),
+        libraryPanelHorizontalOffset: parsed,
+      });
+    } catch (error) {
+      console.warn(NS, 'failed to save setting', error);
+    }
+  }
+}
+
+async function onLibraryPanelVerticalOffsetChange(event: React.ChangeEvent<HTMLInputElement>) {
+  const value = event.target.value;
+
+  console.log(NS, 'vertical offset changed', value);
+
+  setLibraryPanelVerticalOffsetState(value);
+
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isNaN(parsed)) {
+    try {
+      await saveSettings({
+        ...getSettings(),
+        libraryPanelVerticalOffset: parsed,
+      });
+    } catch (error) {
+      console.warn(NS, 'failed to save setting', error);
+    }
+  }
+}
+
+  async function setVisibleContent(
+    key: keyof SteamCompletionCompanionSettings['visibleContent'],
+    value: boolean
+  ) {
+    const nextSettings = {
+      ...settings,
+      visibleContent: {
+        ...settings.visibleContent,
+        [key]: value,
+      },
+    };
+
+    setSettings(nextSettings);
+
+    try {
+      await saveSettings(nextSettings);
+    } catch (error) {
+      console.warn(NS, 'failed to save setting', error);
+    }
+  }
+
+  console.log(NS, 'settings UI render', settings);
 
   return React.createElement(
     React.Fragment,
@@ -176,6 +264,22 @@ async function setVisibleContent(
         margin-bottom: 4px;
         padding-bottom: 3px;
       }
+
+.scc-settings-select,
+.scc-settings-input {
+  min-width: 160px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.16);
+  color: #dfe3e6;
+  background: rgba(0,0,0,0.25);
+}
+
+.scc-settings-input {
+  width: 80px;
+  min-width: 80px;
+}
     `),
 
     React.createElement(SettingsHeader, {
@@ -209,126 +313,188 @@ async function setVisibleContent(
     ),
 
     React.createElement(SettingsHeader, {
+      title: 'Library Position',
+      secondary: true,
+    }),
+
+    React.createElement(
+  Field,
+  {
+    label: 'Panel Position',
+    description: 'Choose where the library panel is anchored.',
+    bottomSeparator: 'standard',
+  },
+  React.createElement(
+    'select',
+    {
+      className: 'scc-settings-select',
+      value: libraryPanelPosition,
+      onChange: onLibraryPanelPositionChange,
+    },
+    LIBRARY_POSITION_OPTIONS.map((option) =>
+      React.createElement(
+        'option',
+        {
+          key: option.value,
+          value: option.value,
+        },
+        option.label
+      )
+    )
+  )
+),
+
+React.createElement(
+  Field,
+  {
+    label: 'Horizontal Offset',
+    description: 'Additional horizontal offset in pixels.',
+    bottomSeparator: 'standard',
+  },
+  React.createElement('input', {
+    className: 'scc-settings-input',
+    type: 'number',
+    value: libraryPanelHorizontalOffset,
+    onChange: onLibraryPanelHorizontalOffsetChange,
+  })
+),
+
+React.createElement(
+  Field,
+  {
+    label: 'Vertical Offset',
+    description: 'Additional vertical offset in pixels.',
+    bottomSeparator: 'standard',
+  },
+  React.createElement('input', {
+    className: 'scc-settings-input',
+    type: 'number',
+    value: libraryPanelVerticalOffset,
+    onChange: onLibraryPanelVerticalOffsetChange,
+  })
+),
+
+    React.createElement(SettingsHeader, {
       title: 'Displayed Content',
       secondary: true,
     }),
 
-React.createElement(
-  Field,
-  {
-    label: 'Median Completion',
-    description: 'Show the median SteamHunters completion time.',
-    bottomSeparator: 'standard',
-  },
-  React.createElement(SettingsToggle, {
-    checked: settings.visibleContent.medianCompletion,
-    onChange: (value: boolean) => setVisibleContent('medianCompletion', value),
-  })
-),
+    React.createElement(
+      Field,
+      {
+        label: 'Median Completion',
+        description: 'Show the median SteamHunters completion time.',
+        bottomSeparator: 'standard',
+      },
+      React.createElement(SettingsToggle, {
+        checked: settings.visibleContent.medianCompletion,
+        onChange: (value: boolean) => setVisibleContent('medianCompletion', value),
+      })
+    ),
 
-React.createElement(
-  Field,
-  {
-    label: 'Players Perfected',
-    description: 'Show how many SteamHunters players perfected the game.',
-    bottomSeparator: 'standard',
-  },
-  React.createElement(SettingsToggle, {
-    checked: settings.visibleContent.playersPerfected,
-    onChange: (value: boolean) => setVisibleContent('playersPerfected', value),
-  })
-),
+    React.createElement(
+      Field,
+      {
+        label: 'Players Perfected',
+        description: 'Show how many SteamHunters players perfected the game.',
+        bottomSeparator: 'standard',
+      },
+      React.createElement(SettingsToggle, {
+        checked: settings.visibleContent.playersPerfected,
+        onChange: (value: boolean) => setVisibleContent('playersPerfected', value),
+      })
+    ),
 
-React.createElement(
-  Field,
-  {
-    label: 'Perfected by Starters',
-    description: 'Show the percentage of starters who perfected the game.',
-    bottomSeparator: 'standard',
-  },
-  React.createElement(SettingsToggle, {
-    checked: settings.visibleContent.perfectedByStarters,
-    onChange: (value: boolean) => setVisibleContent('perfectedByStarters', value),
-  })
-),
+    React.createElement(
+      Field,
+      {
+        label: 'Perfected by Starters',
+        description: 'Show the percentage of starters who perfected the game.',
+        bottomSeparator: 'standard',
+      },
+      React.createElement(SettingsToggle, {
+        checked: settings.visibleContent.perfectedByStarters,
+        onChange: (value: boolean) => setVisibleContent('perfectedByStarters', value),
+      })
+    ),
 
-React.createElement(
-  Field,
-  {
-    label: 'Paid DLC',
-    description: 'Show whether the game has paid DLC.',
-    bottomSeparator: 'standard',
-  },
-  React.createElement(SettingsToggle, {
-    checked: settings.visibleContent.paidDlc,
-    onChange: (value: boolean) => setVisibleContent('paidDlc', value),
-  })
-),
+    React.createElement(
+      Field,
+      {
+        label: 'Paid DLC',
+        description: 'Show whether the game has paid DLC.',
+        bottomSeparator: 'standard',
+      },
+      React.createElement(SettingsToggle, {
+        checked: settings.visibleContent.paidDlc,
+        onChange: (value: boolean) => setVisibleContent('paidDlc', value),
+      })
+    ),
 
-React.createElement(
-  Field,
-  {
-    label: 'Restricted',
-    description: 'Show whether the game is restricted on SteamHunters.',
-    bottomSeparator: 'standard',
-  },
-  React.createElement(SettingsToggle, {
-    checked: settings.visibleContent.restricted,
-    onChange: (value: boolean) => setVisibleContent('restricted', value),
-  })
-),
+    React.createElement(
+      Field,
+      {
+        label: 'Restricted',
+        description: 'Show whether the game is restricted on SteamHunters.',
+        bottomSeparator: 'standard',
+      },
+      React.createElement(SettingsToggle, {
+        checked: settings.visibleContent.restricted,
+        onChange: (value: boolean) => setVisibleContent('restricted', value),
+      })
+    ),
 
-React.createElement(
-  Field,
-  {
-    label: 'Broken but Obtainable',
-    description: 'Show broken but still obtainable achievement count.',
-    bottomSeparator: 'standard',
-  },
-  React.createElement(SettingsToggle, {
-    checked: settings.visibleContent.broken,
-    onChange: (value: boolean) => setVisibleContent('broken', value),
-  })
-),
+    React.createElement(
+      Field,
+      {
+        label: 'Broken but Obtainable',
+        description: 'Show broken but still obtainable achievement count.',
+        bottomSeparator: 'standard',
+      },
+      React.createElement(SettingsToggle, {
+        checked: settings.visibleContent.broken,
+        onChange: (value: boolean) => setVisibleContent('broken', value),
+      })
+    ),
 
-React.createElement(
-  Field,
-  {
-    label: 'Conditionally Obtainable',
-    description: 'Show conditionally obtainable achievement count.',
-    bottomSeparator: 'standard',
-  },
-  React.createElement(SettingsToggle, {
-    checked: settings.visibleContent.conditional,
-    onChange: (value: boolean) => setVisibleContent('conditional', value),
-  })
-),
+    React.createElement(
+      Field,
+      {
+        label: 'Conditionally Obtainable',
+        description: 'Show conditionally obtainable achievement count.',
+        bottomSeparator: 'standard',
+      },
+      React.createElement(SettingsToggle, {
+        checked: settings.visibleContent.conditional,
+        onChange: (value: boolean) => setVisibleContent('conditional', value),
+      })
+    ),
 
-React.createElement(
-  Field,
-  {
-    label: 'Unobtainable',
-    description: 'Show unobtainable achievement count.',
-    bottomSeparator: 'standard',
-  },
-  React.createElement(SettingsToggle, {
-    checked: settings.visibleContent.unobtainable,
-    onChange: (value: boolean) => setVisibleContent('unobtainable', value),
-  })
-),
+    React.createElement(
+      Field,
+      {
+        label: 'Unobtainable',
+        description: 'Show unobtainable achievement count.',
+        bottomSeparator: 'standard',
+      },
+      React.createElement(SettingsToggle, {
+        checked: settings.visibleContent.unobtainable,
+        onChange: (value: boolean) => setVisibleContent('unobtainable', value),
+      })
+    ),
 
-React.createElement(
-  Field,
-  {
-    label: 'SteamHunters Link',
-    description: 'Show the “View on SteamHunters” footer link.',
-    bottomSeparator: 'standard',
-  },
-  React.createElement(SettingsToggle, {
-    checked: settings.visibleContent.steamHuntersLink,
-    onChange: (value: boolean) => setVisibleContent('steamHuntersLink', value),
-  })
-)
+    React.createElement(
+      Field,
+      {
+        label: 'SteamHunters Link',
+        description: 'Show the “View on SteamHunters” footer link.',
+        bottomSeparator: 'standard',
+      },
+      React.createElement(SettingsToggle, {
+        checked: settings.visibleContent.steamHuntersLink,
+        onChange: (value: boolean) => setVisibleContent('steamHuntersLink', value),
+      })
+    )
   );
 }
 

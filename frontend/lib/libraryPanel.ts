@@ -217,9 +217,10 @@ function ensureStyle(doc: Document) {
   style.textContent = `
     #${PANEL_ID} {
       position: absolute;
-      right: 16px;
+      right: auto;
       top: auto;
-      bottom: 96px;
+      bottom: auto;
+      left: auto;
       z-index: 9999;
       width: 330px;
       max-width: calc(100vw - 32px);
@@ -808,29 +809,48 @@ function applyLibraryTheme(doc: Document, container: HTMLElement, panel: HTMLEle
   panel.style.setProperty('--scc-shadow', actionTheme.shadow || pillTheme?.shadow || '0 12px 28px rgba(0, 0, 0, 0.38)');
 }
 
-function applyAdaptiveLibraryPanelPosition(container: HTMLElement, panel: HTMLElement) {
-  const containerRect = container.getBoundingClientRect();
-  const actionBar = findLibraryActionBar(container);
+function applyLibraryPanelPosition(panel: HTMLElement) {
+  const settings = getSettings();
 
-  let bottom = 96;
+  const BASE_HORIZONTAL_OFFSET = 16;
+  const BASE_VERTICAL_OFFSET = 16;
 
-  if (actionBar) {
-    const barRect = actionBar.getBoundingClientRect();
-    const distanceFromContainerBottomToBarTop = containerRect.bottom - barRect.top;
+  const userHorizontalOffset = Number.isFinite(settings.libraryPanelHorizontalOffset)
+    ? settings.libraryPanelHorizontalOffset
+    : 0;
 
-    if (
-      Number.isFinite(distanceFromContainerBottomToBarTop) &&
-      distanceFromContainerBottomToBarTop > 40 &&
-      distanceFromContainerBottomToBarTop < containerRect.height
-    ) {
-      bottom = Math.ceil(distanceFromContainerBottomToBarTop + 10);
-    }
+  const userVerticalOffset = Number.isFinite(settings.libraryPanelVerticalOffset)
+    ? settings.libraryPanelVerticalOffset
+    : 0;
+
+  const horizontalOffset = BASE_HORIZONTAL_OFFSET + userHorizontalOffset;
+  const verticalOffset = BASE_VERTICAL_OFFSET + userVerticalOffset;
+
+  panel.style.left = 'auto';
+  panel.style.right = 'auto';
+  panel.style.top = 'auto';
+  panel.style.bottom = 'auto';
+
+  if (settings.libraryPanelPosition === 'topLeft') {
+    panel.style.left = `${horizontalOffset}px`;
+    panel.style.top = `${verticalOffset}px`;
+    return;
   }
 
-  panel.style.right = '16px';
-  panel.style.left = 'auto';
-  panel.style.top = 'auto';
-  panel.style.bottom = `${bottom}px`;
+  if (settings.libraryPanelPosition === 'topRight') {
+    panel.style.right = `${horizontalOffset}px`;
+    panel.style.top = `${verticalOffset}px`;
+    return;
+  }
+
+  if (settings.libraryPanelPosition === 'bottomLeft') {
+    panel.style.left = `${horizontalOffset}px`;
+    panel.style.bottom = `${verticalOffset}px`;
+    return;
+  }
+
+  panel.style.right = `${horizontalOffset}px`;
+  panel.style.bottom = `${verticalOffset}px`;
 }
 
 function getOrCreatePanel(doc: Document, container: HTMLElement): HTMLElement {
@@ -844,7 +864,7 @@ function getOrCreatePanel(doc: Document, container: HTMLElement): HTMLElement {
     }
 
     container.style.position = 'relative';
-    applyAdaptiveLibraryPanelPosition(container, existing);
+    applyLibraryPanelPosition(existing);
     applyLibraryTheme(doc, container, existing);
     return existing;
   }
@@ -856,7 +876,7 @@ function getOrCreatePanel(doc: Document, container: HTMLElement): HTMLElement {
   container.style.position = 'relative';
   container.appendChild(panel);
 
-  applyAdaptiveLibraryPanelPosition(container, panel);
+  applyLibraryPanelPosition(panel);
   applyLibraryTheme(doc, container, panel);
   return panel;
 }
@@ -940,7 +960,7 @@ const footer = steamHuntersUrl && getSettings().visibleContent.steamHuntersLink
     ${footer}
   `;
 
-  applyAdaptiveLibraryPanelPosition(container, panel);
+  applyLibraryPanelPosition(panel);
   applyLibraryTheme(doc, container, panel);
 }
 
@@ -1008,7 +1028,7 @@ async function updateLibraryPanel(doc: Document, reasonFromCaller: string) {
     existing
   ) {
     container.style.position = 'relative';
-    applyAdaptiveLibraryPanelPosition(container, existing);
+    applyLibraryPanelPosition(existing);
     applyLibraryTheme(doc, container, existing);
     return;
   }
@@ -1106,13 +1126,14 @@ export function setupLibraryObserver(doc: Document) {
 
   currentDocument = doc;
 
-unsubscribeSettings = subscribeSettings((settings: { showInLibrary: boolean }) => {    if (!settings.showInLibrary) {
-      removePanel(doc);
-      return;
-    }
+unsubscribeSettings = subscribeSettings((settings: { showInLibrary: boolean }) => {
+  if (!settings.showInLibrary) {
+    removePanel(doc);
+    return;
+  }
 
-    scheduleLibraryUpdate(doc, 'settings_changed');
-  });
+  scheduleLibraryUpdate(doc, 'settings_changed');
+});
 
   log('setup library observer', {
     docTitle: doc.title,

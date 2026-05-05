@@ -480,17 +480,30 @@ function GetSettings()
     })
 end
 
-function SaveSettings(settings_json)
+function SaveSettings(params)
+    local settings_json = params
+
+    if type(params) == "table" then
+        settings_json = params.settings_json
+    end
+
     local decoded, err = decode_json(settings_json)
 
     if err ~= nil then
+        log("SaveSettings decode failed: " .. tostring(err))
+
         return encode_json({
             ok = false,
-            error = err
+            error = err,
+            settings = settings.load()
         })
     end
 
     local saved = settings.save(decoded)
+
+    if saved ~= true then
+        log("SaveSettings write failed")
+    end
 
     return encode_json({
         ok = saved,

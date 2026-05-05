@@ -2,6 +2,12 @@
 export type IpcValue = string | number | boolean | null;
 export type IpcParams = Record<string, IpcValue>;
 
+export type SteamCompletionCompanionLibraryPanelPosition =
+  | 'topLeft'
+  | 'topRight'
+  | 'bottomLeft'
+  | 'bottomRight';
+
 export type SteamCompletionCompanionVisibleContentSettings = {
   medianCompletion: boolean;
   playersPerfected: boolean;
@@ -17,12 +23,18 @@ export type SteamCompletionCompanionVisibleContentSettings = {
 export type SteamCompletionCompanionSettings = {
   showInLibrary: boolean;
   showOnStorePages: boolean;
+  libraryPanelPosition: SteamCompletionCompanionLibraryPanelPosition;
+  libraryPanelHorizontalOffset: number;
+  libraryPanelVerticalOffset: number;
   visibleContent: SteamCompletionCompanionVisibleContentSettings;
 };
 
 export const DEFAULT_SETTINGS: SteamCompletionCompanionSettings = {
   showInLibrary: true,
   showOnStorePages: true,
+  libraryPanelPosition: 'bottomRight',
+  libraryPanelHorizontalOffset: 0,
+  libraryPanelVerticalOffset: 0,
   visibleContent: {
     medianCompletion: true,
     playersPerfected: true,
