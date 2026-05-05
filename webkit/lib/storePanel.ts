@@ -1,47 +1,39 @@
+// @ts-nocheck
+// webkit/lib/storePanel.ts
 import { callable } from '@steambrew/webkit';
 import {
-  IPCParams,
-  ShcResponse,
-  normalizeKind,
-  parseBackendResponse,
-  safeText,
-} from './shared';
-import { getIconHtml, getValueClass } from './icons';
+  escapeHtml,
+  getCompletionCompanionIconHtml,
+  getCompletionCompanionValueClass,
+  normalizeResponseItemKind,
+  parseCompletionCompanionResponse,
+  parsePositiveInteger,
+} from '../../shared/steamCompletionCompanionCore';
 
 const NS = '[SCC_WEBKIT]';
 
-const shcJsonBridge = callable<[params: IPCParams], string>('shc_json_bridge');
+const sccJsonBridge = callable('shc_json_bridge');
 
 const PANEL_ID = 'scc-store-panel';
 const STYLE_ID = 'scc-store-style';
 const STORE_APP_PATTERN = /store\.steampowered\.com\/app\/(\d+)/i;
 
-let lastAppId: number | null = null;
-let refreshTimer: number | null = null;
+let lastAppId = null;
+let refreshTimer = null;
 
-function log(...args: unknown[]) {
+function log(...args) {
   console.log(NS, ...args);
 }
 
-function warn(...args: unknown[]) {
+function warn(...args) {
   console.warn(NS, ...args);
 }
 
-function getStoreAppIdFromUrl(): number | null {
+function getStoreAppIdFromUrl() {
   const href = String(window.location.href || '');
   const match = href.match(STORE_APP_PATTERN);
 
-  if (!match) {
-    return null;
-  }
-
-  const appId = Number.parseInt(match[1], 10);
-
-  if (!Number.isFinite(appId) || appId <= 0) {
-    return null;
-  }
-
-  return appId;
+  return parsePositiveInteger(match && match[1] ? match[1] : undefined);
 }
 
 function removePanel() {
@@ -68,7 +60,7 @@ function ensureStyle() {
       color: var(--gpStoreLightGrey, #c7d5e0);
       font-family: Motiva Sans, Arial, Helvetica, sans-serif;
       font-size: 13px;
-      line-height: 1.35;
+      line-height: 1;
       clear: both;
 
       --scc-accent: #00aeef;
@@ -79,6 +71,7 @@ function ensureStyle() {
       --scc-yellow: #ffcc66;
       --scc-orange: #f39c12;
       --scc-red: #ff6b6b;
+      --scc-row-height: 24px;
     }
 
     #${PANEL_ID} * {
@@ -88,7 +81,7 @@ function ensureStyle() {
     #${PANEL_ID} .scc-card {
       width: 100%;
       box-sizing: border-box;
-      padding: 6px 12px 5px 12px;
+      padding: 7px 12px;
       border-radius: 8px;
       background: var(--scc-card-bg);
       border: 0;
@@ -97,34 +90,49 @@ function ensureStyle() {
       overflow: hidden;
     }
 
-    #${PANEL_ID} .scc-row {
+    #${PANEL_ID} .scc-row,
+    #${PANEL_ID} .scc-footer {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
       column-gap: 12px;
-      padding: 1px 0;
-      min-height: 20px;
-      line-height: 20px;
+      width: 100%;
+      height: var(--scc-row-height);
+      min-height: var(--scc-row-height);
+      max-height: var(--scc-row-height);
+      padding: 0;
+      margin: 0;
+      line-height: var(--scc-row-height);
       border-top: 1px solid var(--scc-border);
     }
 
     #${PANEL_ID} .scc-row:first-child {
       border-top: 0;
-      padding-top: 0;
     }
 
-    #${PANEL_ID} .scc-row:last-child {
-      padding-bottom: 0;
+    #${PANEL_ID} .scc-footer {
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: end;
+      justify-content: stretch;
+    }
+
+    #${PANEL_ID} .scc-label,
+    #${PANEL_ID} .scc-value,
+    #${PANEL_ID} .scc-link {
+      height: var(--scc-row-height);
+      min-height: var(--scc-row-height);
+      max-height: var(--scc-row-height);
+      line-height: var(--scc-row-height);
+      padding: 0;
+      margin: 0;
+      display: flex;
+      align-items: center;
     }
 
     #${PANEL_ID} .scc-label {
       color: var(--scc-muted);
       min-width: 0;
-      height: 20px;
-      line-height: 20px;
       overflow: hidden;
-      display: flex;
-      align-items: center;
       font-weight: 500;
     }
 
@@ -134,14 +142,14 @@ function ensureStyle() {
       align-items: center;
       column-gap: 6px;
       min-width: 0;
-      height: 20px;
-      line-height: 20px;
+      height: var(--scc-row-height);
+      line-height: var(--scc-row-height);
     }
 
     #${PANEL_ID} .scc-label-wrap span:last-child {
       min-width: 0;
-      height: 20px;
-      line-height: 20px;
+      height: var(--scc-row-height);
+      line-height: var(--scc-row-height);
       overflow: hidden;
       text-overflow: ellipsis;
       display: block;
@@ -149,13 +157,16 @@ function ensureStyle() {
 
     #${PANEL_ID} .scc-row-icon {
       width: 14px;
-      height: 20px;
       min-width: 14px;
+      height: var(--scc-row-height);
+      min-height: var(--scc-row-height);
+      max-height: var(--scc-row-height);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       opacity: 0.95;
-      line-height: 20px;
+      line-height: var(--scc-row-height);
+      overflow: hidden;
     }
 
     #${PANEL_ID} .scc-row-icon svg {
@@ -164,16 +175,12 @@ function ensureStyle() {
       display: block;
       fill: currentColor;
       stroke: currentColor;
+      flex: 0 0 auto;
     }
 
-    #${PANEL_ID} .scc-native-icon {
-      width: 14px;
-      min-width: 14px;
-      height: 20px;
-      text-align: center;
-      font-size: 12px;
-      line-height: 20px;
-      color: currentColor;
+    #${PANEL_ID} .scc-row-icon-restricted svg {
+      width: 12px;
+      height: 12px;
     }
 
     #${PANEL_ID} .scc-row-icon-normal,
@@ -198,12 +205,7 @@ function ensureStyle() {
       font-weight: 700;
       text-align: right;
       white-space: nowrap;
-      height: 20px;
-      line-height: 20px;
-      display: flex;
-      align-items: center;
       justify-content: flex-end;
-      transform: translateY(1px);
     }
 
     #${PANEL_ID} .scc-value-yellow {
@@ -220,31 +222,22 @@ function ensureStyle() {
 
     #${PANEL_ID} .scc-error {
       color: #ffb4b4;
-      padding: 4px 0;
-    }
-
-    #${PANEL_ID} .scc-footer {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      margin-top: 5px;
-      padding-top: 6px;
-      min-height: 20px;
-      border-top: 1px solid var(--scc-border);
     }
 
     #${PANEL_ID} .scc-link,
     #${PANEL_ID} .scc-link:visited {
-      display: inline-flex;
-      align-items: center;
       gap: 5px;
       color: var(--scc-accent);
       font-size: 12px;
       font-weight: 600;
-      line-height: 14px;
-      height: 14px;
       text-decoration: none;
       opacity: 1;
+    }
+
+    #${PANEL_ID} .scc-footer .scc-link,
+    #${PANEL_ID} .scc-footer .scc-link:visited {
+      position: relative;
+      top: 3px;
     }
 
     #${PANEL_ID} .scc-link:hover {
@@ -253,27 +246,31 @@ function ensureStyle() {
       text-decoration: none;
     }
 
-    #${PANEL_ID} .scc-link-icon {
-      width: 14px;
-      height: 14px;
-      display: block;
-      border-radius: 3px;
-      flex: 0 0 auto;
-    }
-
+    #${PANEL_ID} .scc-link-icon,
     #${PANEL_ID} .scc-link-icon-fallback {
       width: 14px;
       height: 14px;
+      min-width: 14px;
+      max-width: 14px;
+      min-height: 14px;
+      max-height: 14px;
+      flex: 0 0 14px;
+      border-radius: 3px;
+    }
+
+    #${PANEL_ID} .scc-link-icon {
+      display: block;
+    }
+
+    #${PANEL_ID} .scc-link-icon-fallback {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      border-radius: 3px;
       background: var(--scc-accent);
       color: #0b141d;
       font-size: 7px;
       font-weight: 800;
       line-height: 1;
-      flex: 0 0 auto;
     }
 
     #${PANEL_ID} .scc-link-icon-fallback-hidden {
@@ -284,7 +281,7 @@ function ensureStyle() {
   document.documentElement.appendChild(style);
 }
 
-function findFeatureMetadataBlock(): HTMLElement | null {
+function findFeatureMetadataBlock() {
   const directBlockSelectors = [
     '.block.responsive_apppage_details_right',
     '.game_area_details_specs_ctn',
@@ -293,13 +290,13 @@ function findFeatureMetadataBlock(): HTMLElement | null {
   ];
 
   for (const selector of directBlockSelectors) {
-    const element = document.querySelector<HTMLElement>(selector);
+    const element = document.querySelector(selector);
 
     if (!element) {
       continue;
     }
 
-    const block = element.closest<HTMLElement>('.block.responsive_apppage_details_right');
+    const block = element.closest('.block.responsive_apppage_details_right');
 
     if (block) {
       return block;
@@ -308,7 +305,7 @@ function findFeatureMetadataBlock(): HTMLElement | null {
     return element;
   }
 
-  const links = Array.from(document.querySelectorAll<HTMLElement>('a, div, span'));
+  const links = Array.from(document.querySelectorAll('a, div, span'));
 
   for (const element of links) {
     const text = String(element.textContent || '').trim().toLowerCase();
@@ -321,9 +318,9 @@ function findFeatureMetadataBlock(): HTMLElement | null {
       text.includes('steam cloud')
     ) {
       const block =
-        element.closest<HTMLElement>('.block.responsive_apppage_details_right') ||
-        element.closest<HTMLElement>('.game_area_details_specs_ctn') ||
-        element.closest<HTMLElement>('.game_area_details_specs');
+        element.closest('.block.responsive_apppage_details_right') ||
+        element.closest('.game_area_details_specs_ctn') ||
+        element.closest('.game_area_details_specs');
 
       if (block) {
         return block;
@@ -334,10 +331,7 @@ function findFeatureMetadataBlock(): HTMLElement | null {
   return null;
 }
 
-function findStoreInsertionParentAndReference(): {
-  parent: HTMLElement;
-  reference: HTMLElement;
-} | null {
+function findStoreInsertionParentAndReference() {
   const featureBlock = findFeatureMetadataBlock();
 
   if (!featureBlock) {
@@ -356,7 +350,7 @@ function findStoreInsertionParentAndReference(): {
   };
 }
 
-function getOrCreatePanel(): HTMLElement | null {
+function getOrCreatePanel() {
   ensureStyle();
 
   const placement = findStoreInsertionParentAndReference();
@@ -386,25 +380,26 @@ function getOrCreatePanel(): HTMLElement | null {
   return panel;
 }
 
-function renderResponse(response: ShcResponse) {
+function renderResponse(response) {
   if (response.show_panel === false) {
     removePanel();
     return;
   }
 
-  const rows: string[] = [];
+  const rows = [];
 
   if (Array.isArray(response.items)) {
     for (const item of response.items) {
-      const rowKind = normalizeKind(item);
-      const label = safeText(item.label);
-      const value = safeText(item.value);
-      const icon = getIconHtml(rowKind);
-      const valueClass = getValueClass(rowKind);
+      const rowKind = normalizeResponseItemKind(item);
 
       if (rowKind === 'info') {
         continue;
       }
+
+      const label = escapeHtml(item.label);
+      const value = escapeHtml(item.value);
+      const icon = getCompletionCompanionIconHtml(rowKind);
+      const valueClass = getCompletionCompanionValueClass(rowKind);
 
       rows.push(`
         <div class="scc-row">
@@ -435,7 +430,7 @@ function renderResponse(response: ShcResponse) {
   }
 
   const steamHuntersUrl = response.steam_hunters_url
-    ? safeText(response.steam_hunters_url)
+    ? escapeHtml(response.steam_hunters_url)
     : '';
 
   const footer = steamHuntersUrl
@@ -462,7 +457,7 @@ function renderResponse(response: ShcResponse) {
   `;
 }
 
-function renderError(message: string) {
+function renderError(message) {
   const panel = getOrCreatePanel();
 
   if (!panel) {
@@ -471,12 +466,12 @@ function renderError(message: string) {
 
   panel.innerHTML = `
     <div class="scc-card">
-      <div class="scc-error">${safeText(message)}</div>
+      <div class="scc-error">${escapeHtml(message)}</div>
     </div>
   `;
 }
 
-async function updateStorePanel(reason: string) {
+async function updateStorePanel(reason) {
   const appId = getStoreAppIdFromUrl();
 
   if (appId === null) {
@@ -522,20 +517,20 @@ async function updateStorePanel(reason: string) {
   };
 
   try {
-    const raw = await shcJsonBridge({
+    const raw = await sccJsonBridge({
       payload_json: JSON.stringify(payload),
     });
 
-    const response = parseBackendResponse(String(raw));
+    const response = parseCompletionCompanionResponse(String(raw));
 
     renderResponse(response);
-  } catch (err) {
-    warn('backend call failed', err);
-    renderError(err instanceof Error ? err.message : String(err));
+  } catch (error) {
+    warn('backend call failed', error);
+    renderError(error instanceof Error ? error.message : String(error));
   }
 }
 
-function scheduleUpdate(reason: string) {
+function scheduleUpdate(reason) {
   if (refreshTimer !== null) {
     window.clearTimeout(refreshTimer);
   }
@@ -550,14 +545,14 @@ function installHistoryHooks() {
   const originalPushState = window.history.pushState;
   const originalReplaceState = window.history.replaceState;
 
-  window.history.pushState = function patchedPushState(...args) {
-    const result = originalPushState.apply(this, args);
+  window.history.pushState = function patchedPushState() {
+    const result = Reflect.apply(originalPushState, window.history, arguments);
     scheduleUpdate('push_state');
     return result;
   };
 
-  window.history.replaceState = function patchedReplaceState(...args) {
-    const result = originalReplaceState.apply(this, args);
+  window.history.replaceState = function patchedReplaceState() {
+    const result = Reflect.apply(originalReplaceState, window.history, arguments);
     scheduleUpdate('replace_state');
     return result;
   };

@@ -1,3 +1,4 @@
+// frontend/index.tsx
 import { useEffect, useState } from 'react';
 import {
   definePlugin,
@@ -8,16 +9,20 @@ import {
   Millennium,
 } from '@steambrew/client';
 
-import { IPCParams, stringifyError } from './lib/shared';
+import {
+  IpcParams,
+  PLUGIN_TITLE,
+  stringifyUnknownError,
+} from '../shared/steamCompletionCompanionCore';
 import {
   cleanupLibraryPanel,
   disconnectLibraryObserver,
   setupLibraryObserver,
 } from './lib/libraryPanel';
 
-const NS = '[SHC_FRONTEND]';
+const NS = '[SCC_FRONTEND]';
 
-const shcJsonBridge = callable<[params: IPCParams], string>('shc_json_bridge');
+const sccJsonBridge = callable<[params: IpcParams], string>('shc_json_bridge');
 
 async function callBackendFromSettings(): Promise<string> {
   const payload = {
@@ -30,13 +35,13 @@ async function callBackendFromSettings(): Promise<string> {
   };
 
   try {
-    const result = await shcJsonBridge({
+    const result = await sccJsonBridge({
       payload_json: JSON.stringify(payload),
     });
 
     return String(result);
-  } catch (err) {
-    return `FAILED:${stringifyError(err)}`;
+  } catch (error) {
+    return `FAILED:${stringifyUnknownError(error)}`;
   }
 }
 
@@ -58,7 +63,7 @@ function ProbeContent() {
 
   return (
     <Field
-      label="SteamHunters Companion Probe"
+      label="Steam Completion Companion Probe"
       description={status}
       bottomSeparator="standard"
     >
@@ -106,7 +111,7 @@ export default definePlugin(() => {
   });
 
   return {
-    title: 'Steam Completion Companion',
+    title: PLUGIN_TITLE,
     icon: <IconsModule.Settings />,
     content: <ProbeContent />,
   };
