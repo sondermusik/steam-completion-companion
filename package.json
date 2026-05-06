@@ -1,27 +1,27 @@
 {
-	"scripts": {
-		"dev": "millennium-ttc --build dev",
-		"build": "millennium-ttc --build prod"
-	},
-	"devDependencies": {
-		"@babel/preset-env": "^7.28.3",
-		"@babel/preset-react": "^7.27.1",
-		"@babel/traverse": "^7.28.3",
-		"@steambrew/ttc": "^3.3.6",
-		"@types/react": "^19.1.12",
-		"@types/react-dom": "^19.1.9",
-		"@types/webpack": "^5.28.5"
-	},
-	"type": "module",
-	"name": "steam-completion-companion",
-	"version": "1.0.0",
-	"description": "Millennium plugin that displays SteamHunters completion data inside Steam",
-	"main": "./frontend/index.jsx",
-	"author": "sondermusik",
-	"license": "MIT",
-	"dependencies": {
-		"@steambrew/api": "^5.5.3",
-		"@steambrew/client": "^5.5.3",
-		"@steambrew/webkit": "^5.5.3"
-	}
+  "scripts": {
+    "dev": "millennium-ttc --build dev",
+    "build": "millennium-ttc --build prod"
+  },
+  "type": "module",
+  "name": "steam-completion-companion",
+  "version": "1.0.0",
+  "description": "Displays SteamHunters completion data inside Steam.",
+  "main": "./frontend/index.tsx",
+  "author": "sondermusik",
+  "license": "MIT",
+  "dependencies": {
+    "@steambrew/api": "^5.5.3",
+    "@steambrew/client": "^5.5.3",
+    "@steambrew/webkit": "^5.5.3"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.28.3",
+    "@babel/preset-react": "^7.27.1",
+    "@babel/traverse": "^7.28.3",
+    "@steambrew/ttc": "^3.3.6",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@types/webpack": "^5.28.5"
+  }
 }
