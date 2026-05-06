@@ -13,11 +13,11 @@
 		"@types/webpack": "^5.28.5"
 	},
 	"type": "module",
-	"name": "millennium-plugin",
+	"name": "steam-completion-companion",
 	"version": "1.0.0",
-	"description": "A template plugin for millennium",
+	"description": "Millennium plugin that displays SteamHunters completion data inside Steam",
 	"main": "./frontend/index.jsx",
-	"author": "Millennium",
+	"author": "sondermusik",
 	"license": "MIT",
 	"dependencies": {
 		"@steambrew/api": "^5.5.3",
