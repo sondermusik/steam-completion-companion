@@ -1,30 +1,71 @@
 # Steam Completion Companion
 
-A Millennium plugin that adds completion-focused game info directly to Steam store and library pages.
+A Millennium plugin that displays SteamHunters completion data inside Steam.
 
-## Current status
+---
 
-Early development prototype.
+## Features
 
-Working:
-- Store page injection for `store.steampowered.com/app/<appid>`
-- Library game page injection
-- Frontend to Lua backend bridge
-- WebKit to Lua backend bridge
-- JSON request/response routing
+- Median completion time  
+- Players perfected  
+- Completion rate (starters → perfected)  
+- Paid DLC indicator  
+- Restricted status  
+- Broken / conditional / unobtainable achievements  
 
-Planned:
-- Estimated average completion time
-- Restricted achievement warnings
-- Paid DLC notes
-- Broken but obtainable achievements
-- Conditionally obtainable achievements
-- Unobtainable achievements
-- Local caching
+---
 
-## Development
+## Library
 
-Install dependencies:
+![Library](./docs/images/library.png)
 
-```powershell
-pnpm install
+Adds a floating panel to the Library app view.
+
+- Matches Steam UI styling  
+- Position and offset configurable  
+- Updates on app change  
+
+---
+
+## Store
+
+![Store](./docs/images/store.png)
+
+Adds a panel to Store pages near the game details.
+
+- Inline layout  
+- Minimal footprint  
+
+---
+
+## Settings
+
+- Toggle Library / Store panels  
+- Adjust position and offsets  
+- Control visible data rows  
+
+---
+
+## Structure
+
+```
+
+backend/     API + caching
+frontend/    Library panel + settings
+webkit/      Store integration
+shared/      Types and utilities
+
+```
+
+---
+
+## Notes
+
+- Only shown for games with achievements  
+- Data is cached to reduce API usage  
+
+---
+
+## License
+
+MIT
