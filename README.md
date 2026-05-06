@@ -1,3 +1,5 @@
+![Header](./docs/images/header.png)
+
 # Steam Completion Companion
 
 A Millennium plugin that displays SteamHunters completion data inside Steam.
@@ -12,6 +14,39 @@ A Millennium plugin that displays SteamHunters completion data inside Steam.
 - Paid DLC indicator  
 - Restricted status  
 - Broken / conditional / unobtainable achievements  
+
+---
+
+## Requirements
+
+- Steam with [Millennium](https://steambrew.app/) installed
+- Internet connection for SteamHunters API requests
+
+---
+
+## Installation
+
+### Via Millennium (recommended)
+
+> Note: Submission is still pending.
+
+1. Open the plugin browser: https://steambrew.app/plugins  
+2. Find **Steam Completion Companion**  
+3. Click **Copy Plugin ID**  
+4. In Steam:  
+   `Steam → Millennium → Plugins → Install a plugin`  
+5. Paste the ID and install  
+
+### For development or manual testing:
+
+```bash
+git clone https://github.com/sondermusik/steam-completion-companion.git
+cd steam-completion-companion
+pnpm install
+pnpm dev
+```
+
+After building, move or symlink the project folder into your Millennium plugins directory.
 
 ---
 
@@ -46,6 +81,13 @@ Adds a panel to Store pages near the game details.
 
 ---
 
+## Notes
+
+- Only shown for games with achievements  
+- Data is cached to reduce API usage  
+
+---
+
 ## Structure
 
 ```
@@ -56,13 +98,6 @@ webkit/      Store integration
 shared/      Types and utilities
 
 ```
-
----
-
-## Notes
-
-- Only shown for games with achievements  
-- Data is cached to reduce API usage  
 
 ---
 
