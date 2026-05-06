@@ -50,3 +50,6 @@ temp/
 # Millennium local/dev artifacts
 *.zip
 *.tgz
+
+# Settings
+settings.json
